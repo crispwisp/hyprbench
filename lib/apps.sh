@@ -28,7 +28,10 @@ hb_mpv_launch() {
     rm -f "$HB_MPV_SOCK"
     hyprctl dispatch exec -- \
         "mpv --input-ipc-server=$HB_MPV_SOCK --loop=inf $* -- $file" >/dev/null
-    for ((i = 0; i < 50; i++)); do
+    # 30s, not 10: under load (parallel validation, ffmpeg generating the
+    # fixture in the same setup) mpv can take >10s to bring the socket up —
+    # observed live; the socket then answers fine
+    for ((i = 0; i < 150; i++)); do
         [[ -S $HB_MPV_SOCK ]] && hb_mpv_get pause >/dev/null 2>&1 && return 0
         sleep 0.2
     done
@@ -81,12 +84,17 @@ hb_steam_launch() {
     local steam_bin
     steam_bin=$(command -v steam) || { echo "hb_steam_launch: no steam" >&2; return 1; }
     hyprctl dispatch exec -- "$steam_bin -cef-enable-debugging" >/dev/null
-    # fresh bootstrap takes ~30s; updates can take longer
+    # Gate on the SIGN-IN PAGE TARGET, not the endpoint: a bootstrapped steam
+    # answers /json within seconds, long before the sign-in window exists —
+    # gating on the endpoint hands oracle/verify a target that isn't there.
     for ((i = 0; i < 300; i++)); do
-        curl -s -m 1 "http://127.0.0.1:$HB_STEAM_CDP_PORT/json" >/dev/null 2>&1 && return 0
+        if curl -s -m 1 "http://127.0.0.1:$HB_STEAM_CDP_PORT/json" 2>/dev/null |
+            jq -e '[.[] | select(.type == "page") | .title] | any(test("sign in"; "i"))' >/dev/null 2>&1; then
+            return 0
+        fi
         sleep 0.5
     done
-    echo "hb_steam_launch: CEF endpoint never appeared" >&2
+    echo "hb_steam_launch: sign-in page target never appeared" >&2
     return 1
 }
 
