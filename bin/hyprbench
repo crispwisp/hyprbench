@@ -86,11 +86,12 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
     mkdir -p "$logdir"
 
     while IFS= read -r task; do
-        local id instr tmo
+        local id instr tmo style
         id=$(jq -r '.id' <<<"$task")
         [[ -n $filter && $id != *"$filter"* ]] && continue
         instr=$(jq -r '.instruction' <<<"$task")
         tmo=${tmo_override:-$(jq -r '.timeout // 60' <<<"$task")}
+        style=$(jq -r '.style // ""' <<<"$task")
 
         printf '%-28s ' "$id"
 
@@ -244,7 +245,9 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
         jq -nc --arg id "$id" --arg status "$status" --arg reason "$reason" \
             --argjson rc "$agent_exit" --argjson secs "$((t1 - t0))" \
             --arg agent "$label" --arg track "$track" --arg mode "$mode" \
-            '{task:$id, track:$track, mode:$mode, status:$status, reason:$reason, agent_exit:$rc, seconds:$secs, agent:$agent}' \
+            --arg style "$style" \
+            '{task:$id, track:$track, mode:$mode, status:$status, reason:$reason, agent_exit:$rc, seconds:$secs, agent:$agent}
+             + (if $style != "" then {style: $style} else {} end)' \
             >>"$outfile"
     done < <(all_tasks)
 

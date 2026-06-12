@@ -1,8 +1,54 @@
 [
   {
+    "id": "wo-swap",
+    "category": "winorg",
+    "difficulty": "medium",
+    "style": "imperative",
+    "instruction": "Swap the positions of the windows 'SwapA' and 'SwapB': each must end up where the other one currently is.",
+    "setup": [
+      "hb_spawn SwapA",
+      "hb_spawn SwapB"
+    ],
+    "oracle": [
+      "dir=$(hyprctl -j clients | jq -r '[.[] | select(.title == \"SwapA\")][0] as $a | [.[] | select(.title == \"SwapB\")][0] as $b | if $b.at[0] > $a.at[0] then \"r\" elif $b.at[0] < $a.at[0] then \"l\" elif $b.at[1] > $a.at[1] then \"d\" else \"u\" end')",
+      "hyprctl dispatch focuswindow 'title:^(SwapA)$'",
+      "hyprctl dispatch swapwindow \"$dir\""
+    ],
+    "verify": [
+      "hb_assert_swapped SwapA SwapB"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "wo-corner",
+    "category": "winorg",
+    "difficulty": "hard",
+    "style": "imperative",
+    "instruction": "Move the window that is currently in the top-right corner of the screen to the bottom-right corner.",
+    "setup": [
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_spawn CornA",
+      "hb_spawn CornB",
+      "hb_spawn CornC",
+      "hb_place CornA 8 8 $((W/4)) $((H/4))",
+      "hb_place CornB $((W - W/4 - 8)) 8 $((W/4)) $((H/4))",
+      "hb_place CornC $((W/2 - W/8)) $((H/2 - H/8)) $((W/4)) $((H/4))"
+    ],
+    "oracle": [
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "t=$(hb_baseline_corner top-right)",
+      "hyprctl dispatch movewindowpixel \"exact $((W - W/4 - 8)) $((H - H/4 - 8)),title:^($t)$\""
+    ],
+    "verify": [
+      "hb_assert_in_corner \"$(hb_baseline_corner top-right)\" bottom-right"
+    ],
+    "timeout": 90
+  },
+  {
     "id": "wo-triangle",
     "category": "winorg",
     "difficulty": "medium",
+    "style": "declarative",
     "instruction": "Arrange the three windows on this workspace in a triangle: one window centered on top, the other two below it side by side (left and right).",
     "setup": [
       "hb_spawn TriA",
@@ -28,6 +74,7 @@
     "id": "wo-grid-2x2-tiled",
     "category": "winorg",
     "difficulty": "hard",
+    "style": "declarative",
     "instruction": "Open four terminal windows on this workspace and arrange them as a 2 by 2 grid using native tiling - no window may be floating.",
     "setup": [],
     "oracle": [
@@ -50,6 +97,7 @@
     "id": "wo-grid-3x3",
     "category": "winorg",
     "difficulty": "hard",
+    "style": "declarative",
     "instruction": "Arrange the nine windows on this workspace into a 3 by 3 grid covering the screen. Floating windows are allowed; the grid allocation must be correct (three columns, three rows, one window per cell).",
     "setup": [
       "for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_spawn $t; done"

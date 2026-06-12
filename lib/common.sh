@@ -9,8 +9,20 @@ HB_TERMINAL=${HB_TERMINAL:-alacritty}
 
 # Launch a nested Hyprland instance with the bench config.
 # Prints the new instance signature on stdout.
+#
+# The nested output's size is whatever the PARENT compositor tiles the
+# instance window to - which varies with host session state and silently
+# changes the bench monitor's aspect ratio (dwindle split direction, float
+# defaults, canvas coordinates all depend on it). hb__pin_parent_window
+# floats the instance's host window to an exact 1280x800 so every run gets
+# the same output geometry. Best-effort: skipped when the runner is not
+# itself inside a Hyprland session.
 hb_launch_instance() {
     local root=$1 logfile=$2 before after sig i
+    local parent_wins=""
+    [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] &&
+        parent_wins=$(hyprctl -j clients 2>/dev/null |
+            jq -c '[.[] | select(.class == "aquamarine") | .address]' || true)
     before=$(ls "$XDG_RUNTIME_DIR/hypr" 2>/dev/null || true)
     setsid Hyprland --config "$root/bench.conf" >"$logfile" 2>&1 &
     HB_HYPR_PID=$!
@@ -22,6 +34,7 @@ hb_launch_instance() {
                 # persist the PID: callers run us in a $() subshell, so a
                 # global variable would be lost (audit finding)
                 echo "$HB_HYPR_PID" >"$XDG_RUNTIME_DIR/hypr/$sig/hb_pid"
+                hb__pin_parent_window "$parent_wins"
                 hb_record_wayland_display "$sig"
                 echo "$sig"
                 return 0
@@ -30,6 +43,28 @@ hb_launch_instance() {
         sleep 0.2
     done
     return 1
+}
+
+# hb__pin_parent_window BEFORE_ADDRS - float the just-launched instance's
+# window in the PARENT session and pin it to exactly 1280x800, so the nested
+# output geometry is deterministic across runs. Runs in the runner env (parent
+# instance); no-op without a parent session.
+hb__pin_parent_window() {
+    local known=$1 addr="" i
+    [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} && -n $known ]] || return 0
+    for ((i = 0; i < 25; i++)); do
+        addr=$(hyprctl -j clients 2>/dev/null | jq -r --argjson known "$known" \
+            '[.[] | select(.class == "aquamarine"
+                and (.address as $a | $known | index($a) | not))][0].address // empty')
+        [[ -n $addr ]] && break
+        sleep 0.2
+    done
+    [[ -n $addr ]] || return 0
+    hyprctl dispatch setfloating "address:$addr" >/dev/null 2>&1
+    hyprctl dispatch resizewindowpixel "exact 1280 800,address:$addr" >/dev/null 2>&1
+    hyprctl dispatch movewindowpixel "exact 0 0,address:$addr" >/dev/null 2>&1
+    sleep 0.5 # let the nested output adopt the new size
+    return 0
 }
 
 # Ask the instance for its WAYLAND_DISPLAY (needed by grim for the vision
@@ -375,4 +410,71 @@ hb_assert_layout_grid() {
                 | all(range(0; $M);
                     . as $r | [$sorted[] | .[$r].y] | (max - min) <= $ty)))
         ' >/dev/null
+}
+
+# --- baseline-geometry references (winorg extension) ------------------------
+# HB_BASELINE records post-setup client geometry, so spatial references like
+# "swap these two" or "the top-right window" resolve against where windows
+# WERE, independent of what the agent has since moved.
+
+# hb__baseline_rect TITLE - the baseline {x,y,w,h} of the client with TITLE.
+hb__baseline_rect() {
+    jq -e --arg t "$1" \
+        '[.[] | select(.title == $t)][0]
+         | {x: .at[0], y: .at[1], w: .size[0], h: .size[1]}' "$HB_BASELINE"
+}
+
+# hb_assert_swapped T1 T2 [TOL] - T1 now occupies T2's baseline region and
+# vice versa: current center within TOL (default: quarter of the smaller
+# baseline dimension) of the other window's baseline center.
+hb_assert_swapped() {
+    local t1=$1 t2=$2 tol=${3:-} r1 r2
+    r1=$(hb__baseline_rect "$t1") || return 1
+    r2=$(hb__baseline_rect "$t2") || return 1
+    hyprctl -j clients | jq -e --arg t1 "$t1" --arg t2 "$t2" \
+        --argjson r1 "$r1" --argjson r2 "$r2" --arg tol "${tol:-}" '
+        def center(c): {x: (c.at[0] + c.size[0]/2), y: (c.at[1] + c.size[1]/2)};
+        def bcenter(r): {x: (r.x + r.w/2), y: (r.y + r.h/2)};
+        def near(a; b; t): ((a.x - b.x) | if . < 0 then -. else . end) <= t
+            and ((a.y - b.y) | if . < 0 then -. else . end) <= t;
+        ([$r1.w, $r1.h, $r2.w, $r2.h] | min / 4) as $deftol
+        | (if $tol == "" then $deftol else ($tol | tonumber) end) as $t
+        | [.[] | select(.title == $t1)][0] as $c1
+        | [.[] | select(.title == $t2)][0] as $c2
+        | ($c1 != null) and ($c2 != null)
+        and near(center($c1); bcenter($r2); $t)
+        and near(center($c2); bcenter($r1); $t)' >/dev/null
+}
+
+# hb_baseline_corner CORNER - print the title of the baseline client whose
+# center is most toward CORNER (top-left|top-right|bottom-left|bottom-right).
+hb_baseline_corner() {
+    local corner=$1 dx dy
+    case $corner in
+    top-left) dx=-1 dy=-1 ;;
+    top-right) dx=1 dy=-1 ;;
+    bottom-left) dx=-1 dy=1 ;;
+    bottom-right) dx=1 dy=1 ;;
+    *) echo "hb_baseline_corner: bad corner '$corner'" >&2; return 1 ;;
+    esac
+    jq -re --argjson dx "$dx" --argjson dy "$dy" \
+        'max_by((.at[0] + .size[0]/2) * $dx + (.at[1] + .size[1]/2) * $dy)
+         | .title' "$HB_BASELINE"
+}
+
+# hb_assert_in_corner TITLE CORNER - the client's current center lies in the
+# outer-third region of the monitor toward CORNER.
+hb_assert_in_corner() {
+    local title=$1 corner=$2 mon
+    mon=$(hyprctl -j monitors | jq 'first | {w: .width, h: .height}')
+    hyprctl -j clients | jq -e --arg t "$title" --arg c "$corner" --argjson m "$mon" '
+        [.[] | select(.title == $t)][0] as $w
+        | $w != null
+        | if . then
+            ($w.at[0] + $w.size[0]/2) as $cx | ($w.at[1] + $w.size[1]/2) as $cy
+            | (($c | startswith("top")) and $cy <= $m.h/3
+               or (($c | startswith("bottom")) and $cy >= 2*$m.h/3))
+              and (($c | endswith("left")) and $cx <= $m.w/3
+               or (($c | endswith("right")) and $cx >= 2*$m.w/3))
+          else false end' >/dev/null
 }

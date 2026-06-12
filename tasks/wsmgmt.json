@@ -1,0 +1,85 @@
+[
+  {
+    "id": "wm-gather-terminals",
+    "category": "wsmgmt",
+    "difficulty": "easy",
+    "style": "imperative",
+    "instruction": "Move all terminal windows on this workspace to workspace 3.",
+    "setup": [
+      "hb_spawn TermA",
+      "hb_spawn TermB"
+    ],
+    "oracle": [
+      "hyprctl dispatch movetoworkspacesilent '3,title:^(TermA)$'",
+      "hyprctl dispatch movetoworkspacesilent '3,title:^(TermB)$'"
+    ],
+    "verify": [
+      "hb_assert_client TermA '.workspace.id == 3'",
+      "hb_assert_client TermB '.workspace.id == 3'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "wm-new-named-ws",
+    "category": "wsmgmt",
+    "difficulty": "medium",
+    "style": "imperative",
+    "instruction": "Send the focused window to a workspace named 'scratch' (a normal named workspace, not a special one).",
+    "setup": [
+      "hb_spawn Mover",
+      "hyprctl dispatch focuswindow 'title:^(Mover)$'"
+    ],
+    "oracle": [
+      "hyprctl dispatch movetoworkspacesilent 'name:scratch,title:^(Mover)$'"
+    ],
+    "verify": [
+      "hb_assert_client Mover '.workspace.name == \"scratch\"'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "wm-return-from-ws5",
+    "category": "wsmgmt",
+    "difficulty": "medium",
+    "style": "imperative",
+    "instruction": "Bring every window from workspace 5 to this workspace (workspace 1).",
+    "setup": [
+      "hyprctl dispatch workspace 5",
+      "hb_spawn FarA",
+      "hb_spawn FarB",
+      "hyprctl dispatch workspace 1"
+    ],
+    "oracle": [
+      "hyprctl dispatch movetoworkspacesilent '1,title:^(FarA)$'",
+      "hyprctl dispatch movetoworkspacesilent '1,title:^(FarB)$'"
+    ],
+    "verify": [
+      "hb_assert_client FarA '.workspace.id == 1'",
+      "hb_assert_client FarB '.workspace.id == 1'",
+      "hb_assert_clients '[.[] | select((.class | test(\"^(hyprbench|benchterm)$\")) and .workspace.id == 5)] | length == 0'"
+    ],
+    "timeout": 90
+  },
+  {
+    "id": "wm-balance",
+    "category": "wsmgmt",
+    "difficulty": "hard",
+    "style": "declarative",
+    "instruction": "There are six terminal windows on workspace 1. Workspaces 1, 2 and 3 should each end up holding exactly two of them. Which windows go where is your choice.",
+    "setup": [
+      "for t in BalA BalB BalC BalD BalE BalF; do hb_spawn $t; done"
+    ],
+    "oracle": [
+      "hyprctl dispatch movetoworkspacesilent '2,title:^(BalC)$'",
+      "hyprctl dispatch movetoworkspacesilent '2,title:^(BalD)$'",
+      "hyprctl dispatch movetoworkspacesilent '3,title:^(BalE)$'",
+      "hyprctl dispatch movetoworkspacesilent '3,title:^(BalF)$'"
+    ],
+    "verify": [
+      "hb_assert_clients '[.[] | select((.class | test(\"^(hyprbench|benchterm)$\")) and .workspace.id == 1)] | length == 2'",
+      "hb_assert_clients '[.[] | select((.class | test(\"^(hyprbench|benchterm)$\")) and .workspace.id == 2)] | length == 2'",
+      "hb_assert_clients '[.[] | select((.class | test(\"^(hyprbench|benchterm)$\")) and .workspace.id == 3)] | length == 2'"
+    ],
+    "timeout": 120
+  }
+]
