@@ -90,6 +90,15 @@ good exactly when it punishes skipping the read-back.
   and platform defaults can violate that silently, per-monitor. Setups must
   *force* the start state away from the goal (resize to 500×400 first), not
   assume it.
+- **Goal-equals-default has a twin: goal-satisfied-by-degenerate-input.** A
+  3×3-grid predicate built on column/row means accepted nine windows stacked
+  on a single point — all spreads zero, every check satisfied. And the
+  default-state rule itself has an environment-dependent form: a host tiler's
+  *natural* layout of three windows can form a "triangle" or not depending on
+  what else the session holds, so the same task validates green and red an
+  hour apart. Predicates need a forced non-goal START (explicit placement,
+  never tiler-natural) and a non-degenerate GOAL (minimum extents between
+  rows/columns).
 - **Shared sessions accumulate other people's state.** A leaked window from
   an unrelated prototype broke three geometry verifiers at once, because they
   counted every client on the workspace. Verifiers over shared environments
