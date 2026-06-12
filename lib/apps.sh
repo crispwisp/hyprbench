@@ -43,9 +43,13 @@ hb_mpv_launch() {
 }
 
 # hb_mpv_cmd ARG... - run one mpv command, print the raw JSON reply.
+# Args that parse as JSON pass through typed (true, 20); the rest as strings.
+# NB: `try fromjson catch .` is WRONG here — catch's input is the error
+# MESSAGE, not the original value, so unparseable strings like get_property
+# become jq error text and mpv rejects the command. Bind the value first.
 # Example: hb_mpv_cmd set_property pause true
 hb_mpv_cmd() {
-    jq -nc '$ARGS.positional | {command: map(try fromjson catch .)}' --args "$@" |
+    jq -nc '{command: [$ARGS.positional[] | . as $s | (try ($s | fromjson) catch $s)]}' --args "$@" |
         socat - "$HB_MPV_SOCK"
 }
 
