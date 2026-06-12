@@ -100,7 +100,9 @@
     "style": "declarative",
     "instruction": "Arrange the nine windows on this workspace into a 3 by 3 grid covering the screen. Floating windows are allowed; the grid allocation must be correct (three columns, three rows, one window per cell).",
     "setup": [
-      "for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_spawn $t; done"
+      "for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_spawn $t; done",
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "i=0; for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_place $t $((i*W/9 + 4)) $((H/2 - H/8)) $((W/9 - 8)) $((H/4)); i=$((i+1)); done"
     ],
     "oracle": [
       "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",

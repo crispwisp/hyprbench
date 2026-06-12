@@ -408,7 +408,17 @@ hb_assert_layout_grid() {
             | all($cols[]; (map(.x) | max - min) <= $tx)
             and ([$cols[] | sort_by(.y)] as $sorted
                 | all(range(0; $M);
-                    . as $r | [$sorted[] | .[$r].y] | (max - min) <= $ty)))
+                    . as $r | [$sorted[] | .[$r].y] | (max - min) <= $ty)
+                # anti-degenerate: adjacent columns/rows must be genuinely
+                # separated, or 9 stacked windows would "form" a 3x3 of zero
+                # extent (probe-confirmed hole before this check existed)
+                and ([$cols[] | (map(.x) | add / length)] as $cm
+                    | all(range(0; $N - 1);
+                        $cm[. + 1] - $cm[.] >= ($m_.w / $N / 2)))
+                and ([range(0; $M) as $r
+                        | ([$sorted[] | .[$r].y] | add / length)] as $rm
+                    | all(range(0; $M - 1);
+                        $rm[. + 1] - $rm[.] >= ($m_.h / $M / 2)))))
         ' >/dev/null
 }
 
