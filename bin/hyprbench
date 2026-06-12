@@ -98,15 +98,39 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
     commit=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
     [[ -n $(git -C "$ROOT" status --porcelain 2>/dev/null) ]] && dirty="-dirty"
     hb__ver() { timeout 5 "$1" --version </dev/null 2>/dev/null | head -1; }
+    # effective model slug, resolved from the source the profile actually
+    # uses (board-ready; never trust a label when the config knows):
+    # override > claude settings (context-tag suffix stripped) > codex
+    # per-profile config > codex default config > unresolved
+    hb__model() {
+        local p=${HB_UNLEASH_PROFILE:-}
+        if [[ -n ${HB_UNLEASH_MODEL:-} ]]; then
+            echo "$HB_UNLEASH_MODEL"
+        elif [[ -z $p ]]; then
+            echo ""
+        elif [[ $p == claude* ]]; then
+            jq -r '.model // empty' "$HOME/.claude/settings.json" 2>/dev/null |
+                sed 's/\[[^]]*\]$//'
+        else
+            local f="$HOME/.codex/$p.config.toml"
+            [[ -r $f ]] || f="$HOME/.codex/config.toml"
+            grep -m1 -oE 'model *= *"[^"]+"' "$f" 2>/dev/null |
+                sed 's/.*"\(.*\)"/\1/'
+        fi
+    }
+    local model_resolved
+    model_resolved=$(hb__model)
+    [[ -z $model_resolved && -n ${HB_UNLEASH_PROFILE:-} ]] && model_resolved="unresolved"
     jq -n --arg commit "$commit$dirty" --arg date "$(date -Is)" \
         --arg host "$(hostname)" --arg mode "$mode" --arg track "$track" \
         --arg label "$label" --arg agent "$agent_abs" \
-        --arg profile "${HB_UNLEASH_PROFILE:-}" --arg model "${HB_UNLEASH_MODEL:-}" \
+        --arg profile "${HB_UNLEASH_PROFILE:-}" --arg model "$model_resolved" \
+        --arg override "${HB_UNLEASH_MODEL:-}" \
         --arg vu "$(hb__ver unleash)" --arg vc "$(hb__ver claude)" \
         --arg vx "$(hb__ver codex)" --arg vp "$(hb__ver pi)" \
         '{hyprbench_commit: $commit, date: $date, host: $host, mode: $mode,
           track: $track, label: $label, agent: $agent,
-          unleash_profile: $profile, model_override: $model,
+          unleash_profile: $profile, model: $model, model_override: $override,
           cli_versions: {unleash: $vu, claude: $vc, codex: $vx, pi: $vp}}' \
         >"$outdir/meta-$label.json"
 
