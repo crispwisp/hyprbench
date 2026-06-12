@@ -18,6 +18,7 @@
 #                       HB_TASK_ID      task id
 #                       HB_TASK_FILE    path to the task json (oracle uses this)
 #                       HB_TRACK        headless | vision
+#                       HB_TASK_TMPDIR  per-task scratch dir, runner-cleaned
 #                       HB_WAYLAND_DISPLAY  bench wayland socket (vision)
 #                       HYPRLAND_INSTANCE_SIGNATURE  bench instance
 #                     hb-look is on PATH in both tracks.
@@ -173,6 +174,14 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
         export HB_ANSWER_FILE="$logdir/answer-$id.txt"
         : >"$HB_ANSWER_FILE"
 
+        # per-task tmpdir, owned and ALWAYS cleaned by the runner. Phases run
+        # in separate shells, so any path one phase invents (mktemp in setup)
+        # is unknowable to teardown - the 144-leaked-chromium-profiles /tmp
+        # quota incident. Cross-phase scratch goes here instead.
+        export HB_TASK_TMPDIR="$logdir/tmp-$id"
+        rm -rf "$HB_TASK_TMPDIR"
+        mkdir -p "$HB_TASK_TMPDIR"
+
         # setup
         local setup
         mapfile -t setup < <(jq -r '.setup[]? // empty' <<<"$task")
@@ -195,6 +204,7 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
                 HB_INSTRUCTION="$instr" HB_TASK_ID="$id" HB_TASK_FILE="$taskfile"
                 HB_TRACK="$track" HB_BASELINE="$HB_BASELINE"
                 HB_ANSWER_FILE="$HB_ANSWER_FILE"
+                HB_TASK_TMPDIR="$HB_TASK_TMPDIR"
                 HYPRLAND_INSTANCE_SIGNATURE="$sig"
                 PATH="$ROOT/bin:$PATH"
             )
@@ -235,6 +245,10 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
         else
             hb_kill_instance "$sig"
         fi
+
+        # the runner's cleanup guarantee: the tmpdir dies with the task,
+        # whatever any phase did or failed to do
+        rm -rf "$HB_TASK_TMPDIR"
 
         case $status in
             pass) pass=$((pass + 1)); echo "PASS  (${agent_exit}rc, $((t1 - t0))s)" ;;
