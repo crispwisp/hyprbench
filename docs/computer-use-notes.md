@@ -131,6 +131,18 @@ Earned during hyprbench development, each by a real incident:
   stderr of `hyprctl dispatch exec` children lands in the compositor log;
   give long-running tools their own log file (`mpv --log-file=...`) or the
   failure story is simply gone.
+- **A measurement of a session is only as valid as the session — preflight
+  your environment, not just your inputs.** Both directions, one incident
+  each: a leaked Steam window broke three geometry verdicts inbound; a leaked
+  nested compositor squeezed a host oracle's layout outbound. Window-level
+  sweeps miss compositor processes holding no interesting windows — host mode
+  now refuses to start while foreign compositor windows exist, failing fast
+  with names instead of a mystery verdict forty tasks in.
+- **Separate "commanded" from "confirmed" before reporting — pipes can eat
+  the exit code that falsifies your report.** A `git push | tail` swallowed
+  a rejection; the push was reported done, and the gate "running" had never
+  started. A kill without verifying death, a push without checking the ref,
+  a launch without polling the socket — all the same lie at different layers.
 - **Steam keeps shared mutable state in `~/.steam`** regardless of which
   compositor instance it renders in — steam tasks must never run
   concurrently with each other, and a bootstrapped steam answers CDP on
