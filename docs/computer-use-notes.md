@@ -80,6 +80,24 @@ returned promise, a 0 exit code — none of them mean the UI state changed.
 Every reliable sequence here is act → read back → branch. A benchmark task is
 good exactly when it punishes skipping the read-back.
 
+## Task design
+
+- **Never make the goal state the default state.** `win-resize-floating`
+  originally asked for 800×600 — which is exactly Hyprland's default float
+  size on a 1280×800 monitor, so in host mode the task passed with zero
+  action (caught by noop validation). Noop validation only protects you when
+  start and goal genuinely differ in *every* environment the suite runs in,
+  and platform defaults can violate that silently, per-monitor. Setups must
+  *force* the start state away from the goal (resize to 500×400 first), not
+  assume it.
+- **Shared sessions accumulate other people's state.** A leaked window from
+  an unrelated prototype broke three geometry verifiers at once, because they
+  counted every client on the workspace. Verifiers over shared environments
+  must scope what they measure — windows the bench owns, or windows that
+  appeared since the baseline — never "everything currently there." That
+  scoping also closes the reverse hole: pre-existing clutter can't *fake* a
+  pass either.
+
 ## Proposed: browser task track
 
 CDP makes browser tasks as verifiable as window-manager tasks: launch a pinned
