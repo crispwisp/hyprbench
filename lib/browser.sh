@@ -30,7 +30,12 @@ hb_browser_launch() {
         return 1
     fi
     [[ -n ${1:-} ]] && url="file://${HB_ROOT:-$PWD}/fixtures/browser/$1"
-    HB_BROWSER_PROFILE=$(mktemp -d "${TMPDIR:-/tmp}/hb-browser.XXXXXX")
+    # Deterministic path, NOT mktemp: setup/verify/teardown run in separate
+    # shells, so a random path chosen in setup is unknowable in teardown —
+    # that exact bug leaked 144 profiles (~3GB) into /tmp across runs and
+    # tripped the tmpfs quota. Derivable-per-port means any phase can clean.
+    HB_BROWSER_PROFILE=${HB_BROWSER_PROFILE:-${TMPDIR:-/tmp}/hb-browser-$HB_CDP_PORT}
+    rm -rf "$HB_BROWSER_PROFILE"
     # exec via the compositor so the window maps inside the bench instance
     hyprctl dispatch exec -- \
         "$browser_bin --remote-debugging-port=$HB_CDP_PORT \
@@ -46,21 +51,18 @@ hb_browser_launch() {
 }
 
 hb_browser_kill() {
-    # kill by profile dir when we know it, else by our debugging port —
-    # also makes this safe as a setup preamble to sweep a previous task's browser
-    local i
-    if [[ -n ${HB_BROWSER_PROFILE:-} ]]; then
-        pkill -f -- "--user-data-dir=$HB_BROWSER_PROFILE" 2>/dev/null || true
-        # chromium keeps writing the profile while dying — wait it out, then
-        # retry the rm (a racing write can resurrect a dir mid-removal)
-        for ((i = 0; i < 25; i++)); do
-            pgrep -f -- "--user-data-dir=$HB_BROWSER_PROFILE" >/dev/null 2>&1 || break
-            sleep 0.2
-        done
-        rm -rf "$HB_BROWSER_PROFILE" 2>/dev/null || { sleep 0.5; rm -rf "$HB_BROWSER_PROFILE"; }
-    else
-        pkill -f -- "--remote-debugging-port=$HB_CDP_PORT" 2>/dev/null || true
-    fi
+    # derive the profile the same way launch does, so teardown (a fresh
+    # shell — phases don't share variables) can always find and remove it
+    local i prof=${HB_BROWSER_PROFILE:-${TMPDIR:-/tmp}/hb-browser-$HB_CDP_PORT}
+    pkill -f -- "--user-data-dir=$prof" 2>/dev/null || true
+    pkill -f -- "--remote-debugging-port=$HB_CDP_PORT" 2>/dev/null || true
+    # chromium keeps writing the profile while dying — wait it out, then
+    # retry the rm (a racing write can resurrect a dir mid-removal)
+    for ((i = 0; i < 25; i++)); do
+        pgrep -f -- "--user-data-dir=$prof" >/dev/null 2>&1 || break
+        sleep 0.2
+    done
+    rm -rf "$prof" 2>/dev/null || { sleep 0.5; rm -rf "$prof"; }
     return 0
 }
 

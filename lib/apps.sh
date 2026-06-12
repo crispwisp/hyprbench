@@ -26,8 +26,11 @@ hb_media_fixture() {
 hb_mpv_launch() {
     local file=$1 i; shift || true
     rm -f "$HB_MPV_SOCK"
+    # --log-file: mpv's own account of a failed start is otherwise lost —
+    # dispatch-exec'd stderr goes to the compositor log, not the phase log
     hyprctl dispatch exec -- \
-        "mpv --input-ipc-server=$HB_MPV_SOCK --loop=inf $* -- $file" >/dev/null
+        "mpv --input-ipc-server=$HB_MPV_SOCK --loop=inf \
+         --log-file=${TMPDIR:-/tmp}/hb-mpv-last.log $* -- $file" >/dev/null
     # 30s, not 10: under load (parallel validation, ffmpeg generating the
     # fixture in the same setup) mpv can take >10s to bring the socket up —
     # observed live; the socket then answers fine
