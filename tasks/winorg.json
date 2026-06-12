@@ -7,7 +7,11 @@
     "setup": [
       "hb_spawn TriA",
       "hb_spawn TriB",
-      "hb_spawn TriC"
+      "hb_spawn TriC",
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_place TriA $((W/8))           $((H/2 - H/8)) $((W/5)) $((H/4))",
+      "hb_place TriB $((W/2 - W/10))    $((H/2 - H/8)) $((W/5)) $((H/4))",
+      "hb_place TriC $((W - W/8 - W/5)) $((H/2 - H/8)) $((W/5)) $((H/4))"
     ],
     "oracle": [
       "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
