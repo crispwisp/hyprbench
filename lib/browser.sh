@@ -34,7 +34,7 @@ hb_browser_launch() {
     # shells, so a random path chosen in setup is unknowable in teardown —
     # that exact bug leaked 144 profiles (~3GB) into /tmp across runs and
     # tripped the tmpfs quota. Derivable-per-port means any phase can clean.
-    HB_BROWSER_PROFILE=${HB_BROWSER_PROFILE:-${TMPDIR:-/tmp}/hb-browser-$HB_CDP_PORT}
+    HB_BROWSER_PROFILE=${HB_BROWSER_PROFILE:-${HB_TASK_TMPDIR:-${TMPDIR:-/tmp}}/hb-browser-$HB_CDP_PORT}
     rm -rf "$HB_BROWSER_PROFILE"
     # exec via the compositor so the window maps inside the bench instance
     hyprctl dispatch exec -- \
@@ -53,7 +53,7 @@ hb_browser_launch() {
 hb_browser_kill() {
     # derive the profile the same way launch does, so teardown (a fresh
     # shell — phases don't share variables) can always find and remove it
-    local i prof=${HB_BROWSER_PROFILE:-${TMPDIR:-/tmp}/hb-browser-$HB_CDP_PORT}
+    local i prof=${HB_BROWSER_PROFILE:-${HB_TASK_TMPDIR:-${TMPDIR:-/tmp}}/hb-browser-$HB_CDP_PORT}
     pkill -f -- "--user-data-dir=$prof" 2>/dev/null || true
     pkill -f -- "--remote-debugging-port=$HB_CDP_PORT" 2>/dev/null || true
     # chromium keeps writing the profile while dying — wait it out, then

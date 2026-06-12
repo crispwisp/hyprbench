@@ -8,7 +8,7 @@
 # mpv is fully scriptable over --input-ipc-server: every property (pause,
 # time-pos, filename, volume, ...) is readable and settable as JSON.
 
-HB_MPV_SOCK=${HB_MPV_SOCK:-${TMPDIR:-/tmp}/hb-mpv.sock}
+HB_MPV_SOCK=${HB_MPV_SOCK:-${HB_TASK_TMPDIR:-${TMPDIR:-/tmp}}/hb-mpv.sock}
 
 # hb_media_fixture [SECONDS] - generate procedural test media (testsrc video
 # + sine audio), print its path. Nothing binary lives in the repo.
@@ -30,7 +30,7 @@ hb_mpv_launch() {
     # dispatch-exec'd stderr goes to the compositor log, not the phase log
     hyprctl dispatch exec -- \
         "mpv --input-ipc-server=$HB_MPV_SOCK --loop=inf \
-         --log-file=${TMPDIR:-/tmp}/hb-mpv-last.log $* -- $file" >/dev/null
+         --log-file=${HB_TASK_TMPDIR:-${TMPDIR:-/tmp}}/hb-mpv-last.log $* -- $file" >/dev/null
     # 30s, not 10: under load (parallel validation, ffmpeg generating the
     # fixture in the same setup) mpv can take >10s to bring the socket up —
     # observed live; the socket then answers fine
@@ -135,7 +135,7 @@ hb_steam_kill() {
 # The digit→title mapping is recorded for verifiers in HB_LABELMAP. (An agent
 # reading that file is out of bounds; it is harness state, not desktop state.)
 
-HB_LABELMAP=${HB_LABELMAP:-${TMPDIR:-/tmp}/hb-labelmap}
+HB_LABELMAP=${HB_LABELMAP:-${HB_TASK_TMPDIR:-${TMPDIR:-/tmp}}/hb-labelmap}
 
 # hb_banner_digit N - print one large block-glyph digit (0-9) on stdout.
 hb_banner_digit() {

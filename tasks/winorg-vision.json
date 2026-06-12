@@ -1,0 +1,81 @@
+[
+  {
+    "id": "wv-swap-labels",
+    "category": "winorg",
+    "difficulty": "hard",
+    "style": "imperative",
+    "tracks": ["vision"],
+    "instruction": "Four windows each display a large number. Swap the positions of window 3 and window 7: each must end up where the other one currently is. Do not move the other windows.",
+    "setup": [
+      "rm -f \"$HB_LABELMAP\"",
+      "hb_spawn_label 1",
+      "hb_spawn_label 3",
+      "hb_spawn_label 5",
+      "hb_spawn_label 7"
+    ],
+    "oracle": [
+      "a=$(hb_label_title 3); b=$(hb_label_title 7)",
+      "dir=$(hyprctl -j clients | jq -r --arg a \"$a\" --arg b \"$b\" '[.[] | select(.title == $a)][0] as $A | [.[] | select(.title == $b)][0] as $B | if $B.at[0] > $A.at[0] then \"r\" elif $B.at[0] < $A.at[0] then \"l\" elif $B.at[1] > $A.at[1] then \"d\" else \"u\" end')",
+      "hyprctl dispatch focuswindow \"title:^($a)$\"",
+      "hyprctl dispatch swapwindow \"$dir\""
+    ],
+    "verify": [
+      "hb_assert_swapped \"$(hb_label_title 3)\" \"$(hb_label_title 7)\""
+    ],
+    "timeout": 150
+  },
+  {
+    "id": "wv-corner-label",
+    "category": "winorg",
+    "difficulty": "hard",
+    "style": "imperative",
+    "tracks": ["vision"],
+    "instruction": "Three floating windows each display a large number. Move the window showing the number 8 to the bottom-right corner of the screen.",
+    "setup": [
+      "rm -f \"$HB_LABELMAP\"",
+      "hb_spawn_label 2",
+      "hb_spawn_label 6",
+      "hb_spawn_label 8",
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_place \"$(hb_label_title 2)\" $((W/12)) $((H/12)) $((W/4)) $((H/4))",
+      "hb_place \"$(hb_label_title 6)\" $((W/2 - W/8)) $((H/12)) $((W/4)) $((H/4))",
+      "hb_place \"$(hb_label_title 8)\" $((W - W/3)) $((H/12)) $((W/4)) $((H/4))"
+    ],
+    "oracle": [
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_place \"$(hb_label_title 8)\" $((W - W/4 - 10)) $((H - H/4 - 10)) $((W/4)) $((H/4))"
+    ],
+    "verify": [
+      "hb_assert_in_corner \"$(hyprctl -j clients | jq -r --arg t \"$(hb_label_title 8)\" '[.[] | select(.title == $t)][0].address')\" bottom-right"
+    ],
+    "timeout": 150
+  },
+  {
+    "id": "wv-order-ascending",
+    "category": "winorg",
+    "difficulty": "hard",
+    "style": "declarative",
+    "tracks": ["vision"],
+    "instruction": "Three floating windows each display a large number. The windows must end up ordered left to right by their displayed number, ascending.",
+    "setup": [
+      "rm -f \"$HB_LABELMAP\"",
+      "hb_spawn_label 2",
+      "hb_spawn_label 5",
+      "hb_spawn_label 9",
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_place \"$(hb_label_title 5)\" $((W/12)) $((H/3)) $((W/5)) $((H/4))",
+      "hb_place \"$(hb_label_title 9)\" $((W/2 - W/10)) $((H/3)) $((W/5)) $((H/4))",
+      "hb_place \"$(hb_label_title 2)\" $((W - W/4)) $((H/3)) $((W/5)) $((H/4))"
+    ],
+    "oracle": [
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_place \"$(hb_label_title 2)\" $((W/12)) $((H/3)) $((W/5)) $((H/4))",
+      "hb_place \"$(hb_label_title 5)\" $((W/2 - W/10)) $((H/3)) $((W/5)) $((H/4))",
+      "hb_place \"$(hb_label_title 9)\" $((W - W/4)) $((H/3)) $((W/5)) $((H/4))"
+    ],
+    "verify": [
+      "hyprctl -j clients | jq -e --arg a \"$(hb_label_title 2)\" --arg b \"$(hb_label_title 5)\" --arg c \"$(hb_label_title 9)\" '[.[] | select(.title == $a)][0] as $A | [.[] | select(.title == $b)][0] as $B | [.[] | select(.title == $c)][0] as $C | ($A.at[0] + $A.size[0]/2) < ($B.at[0] + $B.size[0]/2) and ($B.at[0] + $B.size[0]/2) < ($C.at[0] + $C.size[0]/2)' >/dev/null"
+    ],
+    "timeout": 150
+  }
+]
