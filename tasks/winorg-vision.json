@@ -17,9 +17,10 @@
     ],
     "oracle": [
       "a=$(hb_label_title 3); b=$(hb_label_title 7)",
-      "dir=$(hyprctl -j clients | jq -r --arg a \"$a\" --arg b \"$b\" '[.[] | select(.title == $a)][0] as $A | [.[] | select(.title == $b)][0] as $B | if $B.at[0] > $A.at[0] then \"r\" elif $B.at[0] < $A.at[0] then \"l\" elif $B.at[1] > $A.at[1] then \"d\" else \"u\" end')",
-      "hyprctl dispatch focuswindow \"title:^($a)$\"",
-      "hyprctl dispatch swapwindow \"$dir\""
+      "ga=$(hyprctl -j clients | jq -r --arg t \"$a\" '[.[] | select(.title == $t)][0] | \"\\(.at[0]) \\(.at[1]) \\(.size[0]) \\(.size[1])\"')",
+      "gb=$(hyprctl -j clients | jq -r --arg t \"$b\" '[.[] | select(.title == $t)][0] | \"\\(.at[0]) \\(.at[1]) \\(.size[0]) \\(.size[1])\"')",
+      "hb_place \"$a\" $gb",
+      "hb_place \"$b\" $ga"
     ],
     "verify": [
       "hb_assert_swapped \"$(hb_label_title 3)\" \"$(hb_label_title 7)\""
