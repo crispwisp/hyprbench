@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hyperbench desktop-app helpers: mpv (JSON IPC socket) and Steam (CEF CDP).
+# hyprbench desktop-app helpers: mpv (JSON IPC socket) and Steam (CEF CDP).
 # Sourced after lib/common.sh and lib/browser.sh (steam helpers reuse cdp.mjs).
 # Philosophy as everywhere else: verifiers read application state through the
 # app's own introspection channel, never pixels.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hyperbench shared helpers.
+# hyprbench shared helpers.
 # Sourced by the runner and by task setup/oracle/verify snippets.
 # All hyprctl calls target the instance in $HYPRLAND_INSTANCE_SIGNATURE.
 

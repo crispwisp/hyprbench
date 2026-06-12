@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hyperbench - a computer-use benchmark for Hyprland.
+# hyprbench - a computer-use benchmark for Hyprland.
 #
 # Each task runs in a fresh nested Hyprland instance (OSWorld-style reset) or,
 # in host mode, against the live session with snapshot/restore. The runner
@@ -7,10 +7,10 @@
 # agent under test, then verifies the resulting compositor state via hyprctl.
 #
 # Usage:
-#   hyperbench list                          List tasks
-#   hyperbench run --agent PATH [opts]       Run the suite against an agent
-#   hyperbench validate [--mode M]           Harness sanity: oracle passes, noop fails
-#   hyperbench doctor                        Dependency + vision pipeline check
+#   hyprbench list                          List tasks
+#   hyprbench run --agent PATH [opts]       Run the suite against an agent
+#   hyprbench validate [--mode M]           Harness sanity: oracle passes, noop fails
+#   hyprbench doctor                        Dependency + vision pipeline check
 #
 # Run options:
 #   --agent PATH      Agent executable (required). Receives env:

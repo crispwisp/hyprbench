@@ -109,7 +109,7 @@ good exactly when it punishes skipping the read-back.
 
 ## Harness tooling
 
-Earned during hyperbench development, each by a real incident:
+Earned during hyprbench development, each by a real incident:
 
 - **A helper nothing executes is not code, it is a hypothesis.** An mpv
   command-builder was broken from the day it was written; it survived three

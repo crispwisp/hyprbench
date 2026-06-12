@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hyperbench browser-track helpers (DRAFT — proposed by wisp).
+# hyprbench browser-track helpers (DRAFT — proposed by wisp).
 # Sourced after lib/common.sh. Drives a Chromium pinned to a debugging port
 # inside the bench instance; verifiers assert DOM state over CDP instead of
 # pixels. Fixture pages live in fixtures/browser/ and are loaded as file://

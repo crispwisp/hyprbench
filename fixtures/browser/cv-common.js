@@ -1,4 +1,4 @@
-// hyperbench canvas fixtures — shared scaffolding.
+// hyprbench canvas fixtures — shared scaffolding.
 // Layouts are seeded from the URL (?seed=N) so positions are stable within a
 // run but not memorizable from the repo. Ground truth and interactions are
 // recorded in window.__cv, which verifiers read over CDP. Coordinates in

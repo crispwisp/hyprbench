@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Universal agent adapter: runs any agent CLI through unleash
 # (github.com/heiervang-technologies/unleash) - the unified agent runner.
-# This is the canonical way to run hyperbench against different agents:
+# This is the canonical way to run hyprbench against different agents:
 #
-#   HB_UNLEASH_PROFILE=claude bin/hyperbench run --agent agents/unleash.sh
-#   HB_UNLEASH_PROFILE=codex  bin/hyperbench run --agent agents/unleash.sh --track vision
+#   HB_UNLEASH_PROFILE=claude bin/hyprbench run --agent agents/unleash.sh
+#   HB_UNLEASH_PROFILE=codex  bin/hyprbench run --agent agents/unleash.sh --track vision
 #
 # Env: HB_UNLEASH_PROFILE  agent profile (claude, codex, gemini, opencode,
 #                          antigravity, or custom; default claude)

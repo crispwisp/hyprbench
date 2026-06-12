@@ -1,11 +1,11 @@
-# hyperbench
+# hyprbench
 
 A computer-use benchmark for **Hyprland**. Agents receive a natural-language
 instruction and must drive a real Hyprland compositor to the requested state.
 Success is judged by **execution-based verification** of compositor state via
 `hyprctl -j` — never by inspecting the agent's transcript.
 
-Repo: [crispwisp/hyperbench](https://github.com/crispwisp/hyperbench)
+Repo: [crispwisp/hyprbench](https://github.com/crispwisp/hyprbench)
 
 ## Related work
 
@@ -24,8 +24,8 @@ verification reads structured compositor state instead of pixels.
 
 The same task suite runs under two tracks; the difference is the **observation
 modality available to the model**, not tool access. Both tracks have full
-`hyprctl` IPC access. Scores are reported as **hyperbench_headless** and
-**hyperbench_vision**.
+`hyprctl` IPC access. Scores are reported as **hyprbench_headless** and
+**hyprbench_vision**.
 
 | Track (`--track`) | Sees pixels? | Notes |
 |-------------------|--------------|-------|
@@ -69,19 +69,19 @@ For every task the runner:
 ## Usage
 
 ```sh
-bin/hyperbench list                              # show all tasks (authoritative)
-bin/hyperbench doctor                            # dependency + vision pipeline check
-bin/hyperbench validate                          # oracle must pass all, noop none
-bin/hyperbench validate --mode host              # same, against the live session
-bin/hyperbench run --agent agents/claude-code.sh                  # headless track
-bin/hyperbench run --agent agents/claude-code-vision.sh --track vision
-bin/hyperbench run --agent agents/claude-code.sh --mode host      # live session
-bin/hyperbench run --agent agents/oracle.sh --task win-float
+bin/hyprbench list                              # show all tasks (authoritative)
+bin/hyprbench doctor                            # dependency + vision pipeline check
+bin/hyprbench validate                          # oracle must pass all, noop none
+bin/hyprbench validate --mode host              # same, against the live session
+bin/hyprbench run --agent agents/claude-code.sh                  # headless track
+bin/hyprbench run --agent agents/claude-code-vision.sh --track vision
+bin/hyprbench run --agent agents/claude-code.sh --mode host      # live session
+bin/hyprbench run --agent agents/oracle.sh --task win-float
 ```
 
 ## Tasks
 
-Tasks live in `tasks/*.json`, grouped by category (`bin/hyperbench list` is
+Tasks live in `tasks/*.json`, grouped by category (`bin/hyprbench list` is
 authoritative):
 
 | Category  | Tasks | Examples |
@@ -174,8 +174,8 @@ through [unleash](https://github.com/heiervang-technologies/unleash) (the
 unified agent runner) and injects the right track rules from `HB_TRACK`:
 
 ```sh
-HB_UNLEASH_PROFILE=claude bin/hyperbench run --agent agents/unleash.sh
-HB_UNLEASH_PROFILE=codex  bin/hyperbench run --agent agents/unleash.sh --track vision
+HB_UNLEASH_PROFILE=claude bin/hyprbench run --agent agents/unleash.sh
+HB_UNLEASH_PROFILE=codex  bin/hyprbench run --agent agents/unleash.sh --track vision
 ```
 
 `agents/claude-code.sh` / `agents/claude-code-vision.sh` are direct-CLI
@@ -220,4 +220,4 @@ code, wall-clock seconds. Headline metric: pass rate. Secondary: time per task.
 Hyprland (tested on 0.54), `jq`, `alacritty`, a running Wayland session to
 nest inside (or to evaluate directly in host mode). Vision track: `grim`;
 headless text rendering: `chafa`, `tesseract`. Check with
-`bin/hyperbench doctor`.
+`bin/hyprbench doctor`.
