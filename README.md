@@ -165,6 +165,14 @@ code, wall-clock seconds. Headline metric: pass rate. Secondary: time per task.
   snapshot — any class — plus gaps, border, workspace names, active
   workspace). It does NOT restore per-window properties an agent might set on
   pre-existing windows (fullscreen/float/pin/tag). Use a disposable VM.
+- **Environment boundary at `hyprctl dispatch exec`**: exec'd processes
+  inherit the *compositor's* environment, not the runner's. Nested mode is
+  safe (the nested compositor inherits the runner env), but in host mode the
+  session compositor may lack runner-visible PATH entries (e.g. mise shims) —
+  so the `requires` gate could pass while an exec'd process fails to find a
+  binary. Convention: anything that crosses the dispatch-exec boundary must
+  resolve its binary to an absolute path at snippet time and fail loudly if
+  resolution is empty (see `hb_browser_launch` in `lib/browser.sh`).
 - A **browser track** is drafted (`tasks/browser.json.draft`, `lib/browser.sh`,
   `lib/cdp.mjs`, `fixtures/browser/`): hermetic `file://` fixtures driven over
   the Chrome DevTools Protocol, verified by DOM state. Rename the `.draft`
