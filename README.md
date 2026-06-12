@@ -118,6 +118,12 @@ If any are missing the task yields an unscored **SKIP** (excluded from the
 total, recorded in the JSONL with `reason: "missing:..."`), so optional
 categories degrade gracefully instead of erroring on lean installs.
 
+A task may also declare track membership: `"tracks": ["vision"]` (absent =
+all tracks). Scored runs SKIP (unscored) tasks whose tracks exclude the run's
+`--track`; `validate` ignores track gating, because oracles prove verifier
+soundness via IPC/CDP regardless of observation modality — every task
+validates on every machine that has its `requires`.
+
 ## Writing an agent
 
 An agent is any executable. It gets:

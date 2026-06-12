@@ -58,8 +58,12 @@ run_phase() { # SIG SNIPPET-LINES...
     "
 }
 
-run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE
+run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRACKS
     local agent=$1 filter=$2 label=$3 tmo_override=$4 outfile=$5 track=${6:-headless} mode=${7:-nested}
+    # gate_tracks=1: scored runs skip tasks whose declared tracks exclude the
+    # run's track. validate passes 0 - oracles prove verifier soundness via
+    # IPC/CDP regardless of observation modality, so every task validates.
+    local gate_tracks=${8:-1}
     local pass=0 fail=0 errors=0 total=0 skipped=0
 
     if [[ $mode == "host" && -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
@@ -85,6 +89,22 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE
         tmo=${tmo_override:-$(jq -r '.timeout // 60' <<<"$task")}
 
         printf '%-28s ' "$id"
+
+        # track gate: a task may declare "tracks": ["vision"] (absent = all).
+        # Applies to scored runs only (see gate_tracks above).
+        if [[ $gate_tracks == 1 ]]; then
+            local task_tracks
+            task_tracks=$(jq -r '(.tracks // []) | join(",")' <<<"$task")
+            if [[ -n $task_tracks && ",$task_tracks," != *",$track,"* ]]; then
+                skipped=$((skipped + 1))
+                echo "SKIP  (track: needs $task_tracks, running $track)"
+                jq -nc --arg id "$id" --arg t "$track" --arg agent "$label" \
+                    --arg track "$track" --arg mode "$mode" \
+                    '{task:$id, track:$track, mode:$mode, status:"skip", reason:("track:"+$t), agent:$agent}' \
+                    >>"$outfile"
+                continue
+            fi
+        fi
 
         # dependency gate: a task may declare "requires": ["node", ...].
         # Missing deps yield an unscored SKIP instead of an error, so optional
@@ -280,11 +300,11 @@ validate)
     done
     dir="$RESULTS_DIR/$(date +%Y%m%d-%H%M%S)-$$-validate-$mode"
     echo "--- oracle (every task should PASS) ---"
-    run_suite "$ROOT/agents/oracle.sh" "" "oracle" "" "$dir/oracle.jsonl" headless "$mode"
+    run_suite "$ROOT/agents/oracle.sh" "" "oracle" "" "$dir/oracle.jsonl" headless "$mode" 0
     op=$REPLY_PASS ot=$REPLY_TOTAL
     echo
     echo "--- noop (every task should FAIL) ---"
-    run_suite "$ROOT/agents/noop.sh" "" "noop" "" "$dir/noop.jsonl" headless "$mode"
+    run_suite "$ROOT/agents/noop.sh" "" "noop" "" "$dir/noop.jsonl" headless "$mode" 0
     np=$REPLY_PASS nt=$REPLY_TOTAL
     echo
     if [[ $op -eq $ot && $np -eq 0 ]]; then
