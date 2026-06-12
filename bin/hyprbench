@@ -304,12 +304,30 @@ run)
         "$track" "$mode" 1 "$mutates"
     ;;
 doctor)
-    # Check dependencies and the vision pipeline against a throwaway instance.
+    # Check dependencies, helper contracts, and the vision pipeline.
+    # Helper self-tests exist because of the hb_mpv_cmd incident: a helper
+    # nothing exercises is Schrodinger code - "when a helper fails, test the
+    # helper, not the resource it wraps."
     ok=1
     for dep in Hyprland hyprctl jq alacritty grim chafa tesseract python3; do
         if command -v "$dep" >/dev/null; then echo "ok   $dep"; else echo "MISS $dep"; ok=0; fi
     done
-    echo "--- vision pipeline ---"
+    echo "--- helper self-tests ---"
+    ansf=$(mktemp)
+    printf '  42 cores \n' >"$ansf"
+    if HB_ANSWER_FILE=$ansf hb_assert_answer_exact "42 cores" &&
+        HB_ANSWER_FILE=$ansf hb_assert_answer_regex '42 core' &&
+        HB_ANSWER_FILE=$ansf hb_assert_answer_num 42 0 &&
+        HB_ANSWER_FILE=$ansf hb_assert_answer_num 45 5 &&
+        ! HB_ANSWER_FILE=$ansf hb_assert_answer_exact "43 cores" &&
+        ! HB_ANSWER_FILE=$ansf hb_assert_answer_num 43 0; then
+        echo "ok   answer asserts (exact/regex/num, positive and negative)"
+    else
+        echo "FAIL answer asserts"
+        ok=0
+    fi
+    rm -f "$ansf"
+    echo "--- vision pipeline + compositor helpers ---"
     sig=$(hb_launch_instance "$ROOT" /tmp/hb-doctor.log)
     if [[ -n $sig ]]; then
         echo "ok   nested instance ($sig)"
@@ -321,6 +339,30 @@ doctor)
             { echo "FAIL screenshot: $shot"; ok=0; }
         HYPRLAND_INSTANCE_SIGNATURE=$sig "$ROOT/bin/hb-look" --text >/dev/null 2>&1 &&
             echo "ok   hb-look --text" || { echo "FAIL hb-look --text"; ok=0; }
+        HYPRLAND_INSTANCE_SIGNATURE=$sig "$ROOT/bin/hb-look" --ocr >/dev/null 2>&1 &&
+            echo "ok   hb-look --ocr" || { echo "FAIL hb-look --ocr"; ok=0; }
+        # hb_spawn_shell contract: the spawned shell's /proc cwd is the CWD
+        # we asked for (termtopo verifiers depend on exactly this)
+        cwd_want=$(mktemp -d)
+        if HYPRLAND_INSTANCE_SIGNATURE=$sig bash -c "
+                source '$ROOT/lib/common.sh'
+                hb_spawn_shell DoctorShell '$cwd_want'
+            " >/dev/null 2>&1; then
+            apid=$(HYPRLAND_INSTANCE_SIGNATURE=$sig hyprctl -j clients |
+                jq -r '[.[] | select(.title == "DoctorShell")][0].pid // empty')
+            spid=$(pgrep -P "$apid" 2>/dev/null | head -1)
+            cwd_got=$(readlink "/proc/$spid/cwd" 2>/dev/null || true)
+            if [[ $cwd_got == "$cwd_want" ]]; then
+                echo "ok   hb_spawn_shell (/proc cwd = requested cwd)"
+            else
+                echo "FAIL hb_spawn_shell (wanted $cwd_want, got '$cwd_got')"
+                ok=0
+            fi
+        else
+            echo "FAIL hb_spawn_shell (spawn)"
+            ok=0
+        fi
+        rmdir "$cwd_want" 2>/dev/null
         hb_kill_instance "$sig"
     else
         echo "FAIL nested instance"
