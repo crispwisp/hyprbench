@@ -143,6 +143,14 @@ Earned during hyprbench development, each by a real incident:
   a rejection; the push was reported done, and the gate "running" had never
   started. A kill without verifying death, a push without checking the ref,
   a launch without polling the socket — all the same lie at different layers.
+- **A child that reads stdin inside a `while read` loop eats the loop — and
+  what it eats becomes its prompt.** A spawned agent inherited the process
+  substitution feeding the suite loop: it slurped the remaining 45 task
+  definitions as prompt input (impersonating a context-leak from CWD — a
+  second, real vector that was fixed first) and drained the loop into a
+  1-task suite. One file descriptor, two mysteries. Children inside read
+  loops get `< /dev/null`, always; probes must run *inside* the loop
+  machinery, because a clean-stdin reproduction outside it proves nothing.
 - **Steam keeps shared mutable state in `~/.steam`** regardless of which
   compositor instance it renders in — steam tasks must never run
   concurrently with each other, and a bootstrapped steam answers CDP on
