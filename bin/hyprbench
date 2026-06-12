@@ -71,9 +71,12 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
     local allow_mutates=${9:-0}
     local pass=0 fail=0 errors=0 total=0 skipped=0
 
-    if [[ $mode == "host" && -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
-        echo "host mode requires a running Hyprland session" >&2
-        return 1
+    if [[ $mode == "host" ]]; then
+        if [[ -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+            echo "host mode requires a running Hyprland session" >&2
+            return 1
+        fi
+        hb_host_preflight || return 1
     fi
 
     local agent_abs

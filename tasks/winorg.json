@@ -109,7 +109,7 @@
       "i=0; for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_place $t $(( (i%3)*W/3 + 8 )) $(( (i/3)*H/3 + 8 )) $((W/3 - 16)) $((H/3 - 16)); i=$((i+1)); done"
     ],
     "verify": [
-      "hb_assert_layout_grid 3 3 any owned"
+      "hb_assert_layout_grid 3 3 any owned 0.5"
     ],
     "timeout": 150
   }

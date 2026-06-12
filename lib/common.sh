@@ -99,8 +99,36 @@ hb_kill_instance() {
         # setsid made it a session leader; sweep the whole group so stray
         # clients (alacritty -e sleep) can't outlive a crashed compositor
         kill -- "-$pid" 2>/dev/null
+        # VERIFY death - a silently surviving instance tiles itself into the
+        # host session and corrupts later host-mode measurements (it
+        # happened: a 1h52m leaked instance squeezed a host gate's windows
+        # into half the screen)
+        for ((i = 0; i < 10; i++)); do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 0.3
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -9 "$pid" 2>/dev/null
+            kill -9 -- "-$pid" 2>/dev/null
+            sleep 0.3
+            kill -0 "$pid" 2>/dev/null &&
+                echo "hb_kill_instance: pid $pid REFUSES to die - host session may be contaminated" >&2
+        fi
     fi
     rm -rf "$XDG_RUNTIME_DIR/hypr/$sig" 2>/dev/null || true
+    return 0
+}
+
+# hb_host_preflight - host-mode runs are measurements of a session; a live
+# nested instance window (class aquamarine) tiled into that session skews
+# every geometry verdict. Refuse to measure a contaminated session.
+hb_host_preflight() {
+    local n
+    n=$(hyprctl -j clients | jq '[.[] | select(.class == "aquamarine")] | length')
+    if ((n > 0)); then
+        echo "host-mode preflight: $n nested-instance window(s) (class aquamarine) present in the live session - kill leaked instances first" >&2
+        return 1
+    fi
     return 0
 }
 
@@ -391,34 +419,42 @@ hb_assert_layout_triangle() {
         )' >/dev/null
 }
 
-# hb_assert_layout_grid N M [tiled] [SCOPE] - exactly N*M windows
-# partitioning the screen into N columns x M rows: sorted-by-x centers chunk
-# into N column groups of M with small x-spread, and row heights align across
-# columns. With "tiled", every window must also be non-floating.
+# hb_assert_layout_grid N M [tiled] [SCOPE] [COVERAGE] - exactly N*M windows
+# (N, M >= 2) forming N columns x M rows. Structure is measured against the
+# windows' own bounding box, NOT the monitor: a half-screen grid that shares
+# the workspace with unrelated windows is still a grid (a leaked instance
+# squeezing a correct 2x2 into half the screen taught us this). Degenerate
+# inputs (stacked windows, a single line) fail the minimum-extent and
+# separation checks. With "tiled", every window must be non-floating.
+# COVERAGE (0..1, default 0) additionally requires the center bounding box to
+# span at least that fraction of the monitor - for "covering the screen"
+# tasks.
 hb_assert_layout_grid() {
-    local n=$1 m=$2 tiled=${3:-any} scope=${4:-all} mon
+    local n=$1 m=$2 tiled=${3:-any} scope=${4:-all} cov=${5:-0} mon
     mon=$(hyprctl -j monitors | jq 'first | {w: .width, h: .height}')
     hb__ws_centers "$scope" | jq -e --argjson m_ "$mon" --argjson N "$n" --argjson M "$m" \
-        --arg tiled "$tiled" '
+        --arg tiled "$tiled" --argjson cov "$cov" '
         def chunk(s): [range(0; length; s)] as $is | [$is[] as $i | .[$i:$i+s]];
-        ($m_.w / $N / 3) as $tx | ($m_.h / $M / 3) as $ty
-        | length == ($N * $M)
+        length == ($N * $M)
         and (($tiled != "tiled") or all(.[]; .fl == false))
-        and ((sort_by(.x) | chunk($M)) as $cols
-            | all($cols[]; (map(.x) | max - min) <= $tx)
-            and ([$cols[] | sort_by(.y)] as $sorted
-                | all(range(0; $M);
-                    . as $r | [$sorted[] | .[$r].y] | (max - min) <= $ty)
-                # anti-degenerate: adjacent columns/rows must be genuinely
-                # separated, or 9 stacked windows would "form" a 3x3 of zero
-                # extent (probe-confirmed hole before this check existed)
-                and ([$cols[] | (map(.x) | add / length)] as $cm
-                    | all(range(0; $N - 1);
-                        $cm[. + 1] - $cm[.] >= ($m_.w / $N / 2)))
-                and ([range(0; $M) as $r
-                        | ([$sorted[] | .[$r].y] | add / length)] as $rm
-                    | all(range(0; $M - 1);
-                        $rm[. + 1] - $rm[.] >= ($m_.h / $M / 2)))))
+        and (([.[].x] | max - min) as $sx
+            | ([.[].y] | max - min) as $sy
+            # anti-degenerate: a real grid has real extent in both axes
+            | ($sx >= $m_.w / 10) and ($sy >= $m_.h / 10)
+            # coverage: center bbox must span the asked fraction of screen
+            and ($sx >= $cov * $m_.w) and ($sy >= $cov * $m_.h)
+            and ((sort_by(.x) | chunk($M)) as $cols
+                | all($cols[]; (map(.x) | max - min) <= ($sx / $N / 2))
+                and ([$cols[] | sort_by(.y)] as $sorted
+                    | all(range(0; $M); . as $r
+                        | [$sorted[] | .[$r].y] | (max - min) <= ($sy / $M / 2))
+                    and ([$cols[] | (map(.x) | add / length)] as $cm
+                        | all(range(0; $N - 1);
+                            $cm[. + 1] - $cm[.] >= ($sx / ($N - 1) / 2)))
+                    and ([range(0; $M) as $r
+                            | ([$sorted[] | .[$r].y] | add / length)] as $rm
+                        | all(range(0; $M - 1);
+                            $rm[. + 1] - $rm[.] >= ($sy / ($M - 1) / 2))))))
         ' >/dev/null
 }
 
