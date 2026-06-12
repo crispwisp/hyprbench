@@ -1,0 +1,57 @@
+[
+  {
+    "id": "br-field-overwrite",
+    "category": "browser",
+    "difficulty": "medium",
+    "instruction": "A browser window titled 'account setup' is open. Set the username field on the page to exactly 'wisp'. Do not change anything else on the page.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch form.html"
+    ],
+    "oracle": [
+      "hb_cdp_eval 'document.getElementById(\"username\").value = \"wisp\"'"
+    ],
+    "verify": [
+      "hb_assert_page 'document.getElementById(\"username\").value' '. == \"wisp\"'",
+      "hb_assert_page 'window.__reset' '. == false'"
+    ],
+    "timeout": 90
+  },
+  {
+    "id": "br-delayed-authorize",
+    "category": "browser",
+    "difficulty": "medium",
+    "instruction": "A browser window titled 'account setup' is open. Click the 'authorize' button on the page. Do not click 'reset form'.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch form.html"
+    ],
+    "oracle": [
+      "hb_wait_page 'document.getElementById(\"authorize\").disabled === false' 10",
+      "hb_cdp_eval 'document.getElementById(\"authorize\").click()'"
+    ],
+    "verify": [
+      "hb_assert_page 'window.__authorized' '. == true'",
+      "hb_assert_page 'window.__reset' '. == false'"
+    ],
+    "timeout": 90
+  },
+  {
+    "id": "br-follow-link",
+    "category": "browser",
+    "difficulty": "easy",
+    "instruction": "A browser window titled 'account setup' is open. Follow the 'continue' link on the page.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch form.html"
+    ],
+    "oracle": [
+      "hb_cdp_eval 'document.getElementById(\"continue\").click()'",
+      "hb_wait_page 'location.pathname.endsWith(\"done.html\")' 10"
+    ],
+    "verify": [
+      "hb_assert_page 'location.pathname.endsWith(\"done.html\")'"
+    ],
+    "timeout": 60
+  }
+]

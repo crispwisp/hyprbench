@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+# hyperbench - a computer-use benchmark for Hyprland.
+#
+# Each task runs in a fresh nested Hyprland instance (OSWorld-style reset) or,
+# in host mode, against the live session with snapshot/restore. The runner
+# executes the task's setup, hands the natural-language instruction to the
+# agent under test, then verifies the resulting compositor state via hyprctl.
+#
+# Usage:
+#   hyperbench list                          List tasks
+#   hyperbench run --agent PATH [opts]       Run the suite against an agent
+#   hyperbench validate [--mode M]           Harness sanity: oracle passes, noop fails
+#   hyperbench doctor                        Dependency + vision pipeline check
+#
+# Run options:
+#   --agent PATH      Agent executable (required). Receives env:
+#                       HB_INSTRUCTION  natural-language task
+#                       HB_TASK_ID      task id
+#                       HB_TASK_FILE    path to the task json (oracle uses this)
+#                       HB_TRACK        headless | vision
+#                       HB_WAYLAND_DISPLAY  bench wayland socket (vision)
+#                       HYPRLAND_INSTANCE_SIGNATURE  bench instance
+#                     hb-look is on PATH in both tracks.
+#   --track NAME      headless (default) or vision. Both tracks have full
+#                     hyprctl IPC access; vision agents may additionally view
+#                     screenshots with the image modality. Headless agents may
+#                     only consume text renderings (hb-look --text / --ocr).
+#   --mode NAME       nested (default): fresh nested Hyprland per task.
+#                     host: drive the CURRENT live session (run this only in a
+#                     disposable VM); state is snapshotted and restored around
+#                     each task, but it is not hermetic.
+#   --task SUBSTR     Only run tasks whose id contains SUBSTR
+#   --label NAME      Label for the results directory
+#   --timeout SECS    Override per-task timeout
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TASKS_DIR="$ROOT/tasks"
+RESULTS_DIR="$ROOT/results"
+export HB_ROOT="$ROOT" # for helper libs (e.g. lib/browser.sh) and agents
+# shellcheck source=../lib/common.sh
+source "$ROOT/lib/common.sh"
+
+# Emit every task as a compact json line (task files are per-category arrays).
+all_tasks() {
+    jq -c '.[]' "$TASKS_DIR"/*.json
+}
+
+run_phase() { # SIG SNIPPET-LINES...
+    local sig=$1
+    shift
+    HYPRLAND_INSTANCE_SIGNATURE=$sig bash -c "
+        set -e
+        source '$ROOT/lib/common.sh'
+        $(printf '%s\n' "$@")
+    "
+}
+
+run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE
+    local agent=$1 filter=$2 label=$3 tmo_override=$4 outfile=$5 track=${6:-headless} mode=${7:-nested}
+    local pass=0 fail=0 errors=0 total=0
+
+    if [[ $mode == "host" && -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+        echo "host mode requires a running Hyprland session" >&2
+        return 1
+    fi
+
+    local agent_abs
+    agent_abs=$(realpath "$agent") || return 1
+    [[ -x $agent_abs ]] || { echo "agent not executable: $agent_abs" >&2; return 1; }
+
+    mkdir -p "$(dirname "$outfile")"
+    : >"$outfile"
+    local logdir
+    logdir="$(dirname "$outfile")/logs"
+    mkdir -p "$logdir"
+
+    while IFS= read -r task; do
+        local id instr tmo
+        id=$(jq -r '.id' <<<"$task")
+        [[ -n $filter && $id != *"$filter"* ]] && continue
+        instr=$(jq -r '.instruction' <<<"$task")
+        tmo=${tmo_override:-$(jq -r '.timeout // 60' <<<"$task")}
+        total=$((total + 1))
+
+        printf '%-28s ' "$id"
+
+        local sig snapfile=""
+        if [[ $mode == "host" ]]; then
+            sig=$HYPRLAND_INSTANCE_SIGNATURE
+            snapfile="$logdir/host-snapshot-$id.json"
+            HYPRLAND_INSTANCE_SIGNATURE=$sig hb_host_snapshot "$snapfile"
+        else
+            sig=$(hb_launch_instance "$ROOT" "$logdir/hyprland-$id.log")
+        fi
+        if [[ -z $sig ]]; then
+            echo "ERROR (instance failed to start)"
+            errors=$((errors + 1))
+            jq -nc --arg id "$id" '{task:$id, status:"error", reason:"instance"}' >>"$outfile"
+            continue
+        fi
+
+        local taskfile="$logdir/task-$id.json"
+        printf '%s' "$task" >"$taskfile"
+
+        local status="pass" reason="" agent_exit=0
+        local t0 t1
+        t0=$SECONDS
+
+        # point HB_BASELINE at this task's file BEFORE setup runs so no phase
+        # can ever see a stale baseline from a previous task (audit finding)
+        export HB_BASELINE="$logdir/baseline-$id.json"
+        echo '[]' >"$HB_BASELINE"
+
+        # setup
+        local setup
+        mapfile -t setup < <(jq -r '.setup[]? // empty' <<<"$task")
+        if ((${#setup[@]})) && ! run_phase "$sig" "${setup[@]}" >>"$logdir/setup-$id.log" 2>&1; then
+            status="error" reason="setup"
+        fi
+
+        # baseline: clients that exist after setup. hb_assert_new /
+        # hb_assert_baseline_gone verify relative to this, which keeps
+        # verifiers correct in host mode.
+        HYPRLAND_INSTANCE_SIGNATURE=$sig hyprctl -j clients >"$HB_BASELINE" 2>/dev/null ||
+            echo '[]' >"$HB_BASELINE"
+
+        # agent
+        if [[ $status == "pass" ]]; then
+            local wd
+            wd=$(hb_wayland_display "$sig" || true)
+            [[ -z $wd && $mode == "host" ]] && wd=${WAYLAND_DISPLAY:-}
+            local agent_env=(
+                HB_INSTRUCTION="$instr" HB_TASK_ID="$id" HB_TASK_FILE="$taskfile"
+                HB_TRACK="$track" HB_BASELINE="$HB_BASELINE"
+                HYPRLAND_INSTANCE_SIGNATURE="$sig"
+                PATH="$ROOT/bin:$PATH"
+            )
+            [[ $track == "vision" ]] && agent_env+=(HB_WAYLAND_DISPLAY="$wd")
+            env "${agent_env[@]}" timeout "$tmo" "$agent_abs" \
+                >"$logdir/agent-$id.log" 2>&1
+            agent_exit=$?
+        fi
+
+        # verify (let the compositor settle first). A task without verify
+        # lines is a task-definition bug, never a pass.
+        local verify
+        mapfile -t verify < <(jq -r '.verify[]? // empty' <<<"$task")
+        if ((${#verify[@]} == 0)); then
+            status="error" reason="no-verify"
+        elif [[ $status == "pass" ]]; then
+            sleep 0.5
+            if ! run_phase "$sig" "${verify[@]}" >>"$logdir/verify-$id.log" 2>&1; then
+                status="fail" reason="verify"
+            fi
+        fi
+
+        t1=$SECONDS
+
+        # teardown (optional, best-effort, not scored)
+        local teardown
+        mapfile -t teardown < <(jq -r '.teardown[]? // empty' <<<"$task")
+        if ((${#teardown[@]})); then
+            run_phase "$sig" "${teardown[@]}" >>"$logdir/teardown-$id.log" 2>&1 || true
+        fi
+
+        if [[ $mode == "host" ]]; then
+            (
+                export HYPRLAND_INSTANCE_SIGNATURE=$sig
+                hb_host_restore "$snapfile"
+            ) >>"$logdir/restore-$id.log" 2>&1 ||
+                echo "  (warning: host restore incomplete, see logs)" >&2
+        else
+            hb_kill_instance "$sig"
+        fi
+
+        case $status in
+            pass) pass=$((pass + 1)); echo "PASS  (${agent_exit}rc, $((t1 - t0))s)" ;;
+            fail) fail=$((fail + 1)); echo "FAIL  (${agent_exit}rc, $((t1 - t0))s)" ;;
+            *)    errors=$((errors + 1)); echo "ERROR ($reason)" ;;
+        esac
+
+        jq -nc --arg id "$id" --arg status "$status" --arg reason "$reason" \
+            --argjson rc "$agent_exit" --argjson secs "$((t1 - t0))" \
+            --arg agent "$label" --arg track "$track" --arg mode "$mode" \
+            '{task:$id, track:$track, mode:$mode, status:$status, reason:$reason, agent_exit:$rc, seconds:$secs, agent:$agent}' \
+            >>"$outfile"
+    done < <(all_tasks)
+
+    echo
+    echo "== $label [$track/$mode]: $pass/$total passed, $fail failed, $errors errors =="
+    echo "results: $outfile"
+    REPLY_PASS=$pass REPLY_TOTAL=$total
+}
+
+cmd=${1:-help}
+shift || true
+
+case $cmd in
+list)
+    all_tasks | jq -r '[.id, .category, .difficulty] | @tsv' |
+        awk -F'\t' 'BEGIN{printf "%-28s %-10s %s\n","TASK","CATEGORY","DIFFICULTY"}{printf "%-28s %-10s %s\n",$1,$2,$3}'
+    ;;
+run)
+    agent="" filter="" label="" tmo="" track="headless" mode="nested"
+    while (($#)); do
+        case $1 in
+        --agent) agent=${2:?--agent requires a value}; shift 2 ;;
+        --task) filter=${2:?--task requires a value}; shift 2 ;;
+        --label) label=${2:?--label requires a value}; shift 2 ;;
+        --timeout) tmo=${2:?--timeout requires a value}; shift 2 ;;
+        --track) track=${2:?--track requires a value}; shift 2 ;;
+        --mode) mode=${2:?--mode requires a value}; shift 2 ;;
+        *) echo "unknown option: $1" >&2; exit 2 ;;
+        esac
+    done
+    [[ -n $agent ]] || { echo "--agent is required" >&2; exit 2; }
+    [[ $track == "headless" || $track == "vision" ]] ||
+        { echo "--track must be headless or vision" >&2; exit 2; }
+    [[ $mode == "nested" || $mode == "host" ]] ||
+        { echo "--mode must be nested or host" >&2; exit 2; }
+    label=${label:-$(basename "$agent" .sh)}
+    run_suite "$agent" "$filter" "$label" "$tmo" \
+        "$RESULTS_DIR/$(date +%Y%m%d-%H%M%S)-$$-$mode-$track-$label/results.jsonl" \
+        "$track" "$mode"
+    ;;
+doctor)
+    # Check dependencies and the vision pipeline against a throwaway instance.
+    ok=1
+    for dep in Hyprland hyprctl jq alacritty grim chafa tesseract; do
+        if command -v "$dep" >/dev/null; then echo "ok   $dep"; else echo "MISS $dep"; ok=0; fi
+    done
+    echo "--- vision pipeline ---"
+    sig=$(hb_launch_instance "$ROOT" /tmp/hb-doctor.log)
+    if [[ -n $sig ]]; then
+        echo "ok   nested instance ($sig)"
+        wd=$(hb_wayland_display "$sig")
+        echo "ok   wayland display ($wd)"
+        shot=$(HYPRLAND_INSTANCE_SIGNATURE=$sig "$ROOT/bin/hb-look" 2>&1) &&
+            file "$shot" | grep -q PNG &&
+            echo "ok   screenshot ($shot, $(stat -c%s "$shot") bytes)" ||
+            { echo "FAIL screenshot: $shot"; ok=0; }
+        HYPRLAND_INSTANCE_SIGNATURE=$sig "$ROOT/bin/hb-look" --text >/dev/null 2>&1 &&
+            echo "ok   hb-look --text" || { echo "FAIL hb-look --text"; ok=0; }
+        hb_kill_instance "$sig"
+    else
+        echo "FAIL nested instance"
+        ok=0
+    fi
+    ((ok)) && echo "DOCTOR OK" || { echo "DOCTOR FAILED"; exit 1; }
+    ;;
+validate)
+    # Oracle must pass every task; noop must pass none. Anything else means
+    # the harness or a task definition is broken.
+    mode="nested"
+    while (($#)); do
+        case $1 in
+        --mode) mode=${2:?--mode requires a value}; shift 2 ;;
+        *) echo "unknown option: $1" >&2; exit 2 ;;
+        esac
+    done
+    dir="$RESULTS_DIR/$(date +%Y%m%d-%H%M%S)-$$-validate-$mode"
+    echo "--- oracle (every task should PASS) ---"
+    run_suite "$ROOT/agents/oracle.sh" "" "oracle" "" "$dir/oracle.jsonl" headless "$mode"
+    op=$REPLY_PASS ot=$REPLY_TOTAL
+    echo
+    echo "--- noop (every task should FAIL) ---"
+    run_suite "$ROOT/agents/noop.sh" "" "noop" "" "$dir/noop.jsonl" headless "$mode"
+    np=$REPLY_PASS nt=$REPLY_TOTAL
+    echo
+    if [[ $op -eq $ot && $np -eq 0 ]]; then
+        echo "VALIDATION OK ($mode): oracle $op/$ot, noop $np/$nt"
+    else
+        echo "VALIDATION FAILED ($mode): oracle $op/$ot (want $ot/$ot), noop $np/$nt (want 0/$nt)"
+        exit 1
+    fi
+    ;;
+*)
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+esac

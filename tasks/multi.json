@@ -1,0 +1,61 @@
+[
+  {
+    "id": "multi-two-terms-ws5",
+    "category": "multi",
+    "difficulty": "hard",
+    "instruction": "Open exactly two terminal windows on workspace 5. Both must be tiled (not floating).",
+    "setup": [],
+    "oracle": [
+      "hyprctl dispatch workspace 5",
+      "hb_spawn TermA",
+      "hb_spawn TermB"
+    ],
+    "verify": [
+      "hb_assert_new '.workspace.id == 5' '== 2'",
+      "hb_assert_new '.workspace.id == 5 and .floating == false' '== 2'"
+    ],
+    "timeout": 120
+  },
+  {
+    "id": "multi-junk-cleanup",
+    "category": "multi",
+    "difficulty": "hard",
+    "instruction": "Close every window whose title starts with 'Junk'. The window titled 'Keeper' must stay open.",
+    "setup": [
+      "hb_spawn Junk1",
+      "hb_spawn Keeper",
+      "hyprctl dispatch workspace 2",
+      "hb_spawn Junk2",
+      "hb_spawn Junk3",
+      "hyprctl dispatch workspace 1"
+    ],
+    "oracle": [
+      "hb_close_matching '.title | startswith(\"Junk\")' 20"
+    ],
+    "verify": [
+      "hb_assert_baseline_gone '.title | startswith(\"Junk\")'",
+      "hb_assert_clients 'any(.[]; .title == \"Keeper\")'"
+    ],
+    "timeout": 120
+  },
+  {
+    "id": "multi-float-arrange",
+    "category": "multi",
+    "difficulty": "hard",
+    "instruction": "Make the window titled 'Target' floating, resize it to 640 by 480 pixels, and place its top-left corner at position 50,50.",
+    "setup": [
+      "hb_spawn Target"
+    ],
+    "oracle": [
+      "hyprctl dispatch setfloating 'title:^(Target)$'",
+      "hyprctl dispatch resizewindowpixel 'exact 640 480,title:^(Target)$'",
+      "hyprctl dispatch movewindowpixel 'exact 50 50,title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_client Target '.floating == true'",
+      "hb_assert_near Target size 640 480 10",
+      "hb_assert_near Target at 50 50"
+    ],
+    "timeout": 120
+  }
+]

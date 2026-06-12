@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# hb-look - capture a screenshot of the bench Hyprland instance.
+#
+# Usage: hb-look [OUTPUT.png]   capture, print the written PNG path
+#        hb-look --text         capture, print an ASCII rendering (chafa)
+#        hb-look --ocr          capture, print extracted text (tesseract)
+#
+# Track rules: vision agents may view the PNG directly (image modality).
+# Headless agents may use --text / --ocr (or any other image-to-text
+# conversion) but must never feed the image itself to the model.
+set -euo pipefail
+
+mode=png
+case ${1:-} in
+--text) mode=text; shift ;;
+--ocr) mode=ocr; shift ;;
+esac
+
+out=${1:-$(mktemp --suffix=.png "${TMPDIR:-/tmp}/hb-look-XXXXXX")}
+
+wd=${HB_WAYLAND_DISPLAY:-}
+if [[ -z $wd && -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+    wd=$(cat "$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hb_wayland_display" 2>/dev/null || true)
+fi
+# host mode: the bench instance IS the current session
+wd=${wd:-${WAYLAND_DISPLAY:-}}
+[[ -n $wd ]] || { echo "hb-look: cannot determine bench WAYLAND_DISPLAY" >&2; exit 1; }
+
+WAYLAND_DISPLAY=$wd grim "$out"
+
+case $mode in
+png) echo "$out" ;;
+text) chafa --format symbols --symbols ascii --fg-only --size 140x45 "$out" ;;
+ocr) tesseract "$out" stdout 2>/dev/null ;;
+esac

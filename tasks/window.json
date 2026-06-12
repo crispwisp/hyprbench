@@ -1,0 +1,155 @@
+[
+  {
+    "id": "win-move-ws",
+    "category": "window",
+    "difficulty": "easy",
+    "instruction": "Move the window titled 'Target' to workspace 4.",
+    "setup": [
+      "hb_spawn Target"
+    ],
+    "oracle": [
+      "hyprctl dispatch movetoworkspacesilent '4,title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_client Target '.workspace.id == 4'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-float",
+    "category": "window",
+    "difficulty": "easy",
+    "instruction": "Make the window titled 'Target' floating.",
+    "setup": [
+      "hb_spawn Target"
+    ],
+    "oracle": [
+      "hyprctl dispatch setfloating 'title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_client Target '.floating == true'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-fullscreen",
+    "category": "window",
+    "difficulty": "easy",
+    "instruction": "Make the window titled 'Target' fullscreen.",
+    "setup": [
+      "hb_spawn Target"
+    ],
+    "oracle": [
+      "hyprctl dispatch focuswindow 'title:^(Target)$'",
+      "hyprctl dispatch fullscreen 0"
+    ],
+    "verify": [
+      "hb_assert_client Target '.fullscreen != 0 and .fullscreen != false and .fullscreen != null'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-close",
+    "category": "window",
+    "difficulty": "easy",
+    "instruction": "Close the window titled 'Target'. Do not close any other window.",
+    "setup": [
+      "hb_spawn Target",
+      "hb_spawn Keeper"
+    ],
+    "oracle": [
+      "hb_close_matching '.title == \"Target\" and .class == \"hyprbench\"'"
+    ],
+    "verify": [
+      "hb_assert_baseline_gone '.title == \"Target\" and .class == \"hyprbench\"'",
+      "hb_assert_clients 'any(.[]; .title == \"Keeper\")'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-focus",
+    "category": "window",
+    "difficulty": "easy",
+    "instruction": "Focus the window titled 'Beta'.",
+    "setup": [
+      "hb_spawn Alpha",
+      "hb_spawn Beta",
+      "hb_spawn Gamma",
+      "hyprctl dispatch focuswindow 'title:^(Gamma)$'"
+    ],
+    "oracle": [
+      "hyprctl dispatch focuswindow 'title:^(Beta)$'"
+    ],
+    "verify": [
+      "hb_assert_active '.title == \"Beta\"'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-pin",
+    "category": "window",
+    "difficulty": "medium",
+    "instruction": "Pin the window titled 'Target' so it shows on all workspaces.",
+    "setup": [
+      "hb_spawn Target",
+      "hyprctl dispatch setfloating 'title:^(Target)$'"
+    ],
+    "oracle": [
+      "hyprctl dispatch pin 'title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_client Target '.pinned == true'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-tag",
+    "category": "window",
+    "difficulty": "medium",
+    "instruction": "Add the tag 'urgent' to the window titled 'Target'.",
+    "setup": [
+      "hb_spawn Target"
+    ],
+    "oracle": [
+      "hyprctl dispatch tagwindow '+urgent title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_client Target '.tags | index(\"urgent\") != null'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-resize-floating",
+    "category": "window",
+    "difficulty": "medium",
+    "instruction": "Resize the floating window titled 'Target' to 800 by 600 pixels.",
+    "setup": [
+      "hb_spawn Target",
+      "hyprctl dispatch setfloating 'title:^(Target)$'"
+    ],
+    "oracle": [
+      "hyprctl dispatch resizewindowpixel 'exact 800 600,title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_near Target size 800 600 10"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "win-move-floating",
+    "category": "window",
+    "difficulty": "medium",
+    "instruction": "Move the floating window titled 'Target' so its top-left corner is at position 100,100.",
+    "setup": [
+      "hb_spawn Target",
+      "hyprctl dispatch setfloating 'title:^(Target)$'"
+    ],
+    "oracle": [
+      "hyprctl dispatch movewindowpixel 'exact 100 100,title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_near Target at 100 100"
+    ],
+    "timeout": 60
+  }
+]

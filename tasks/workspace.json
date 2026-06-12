@@ -1,0 +1,46 @@
+[
+  {
+    "id": "ws-switch",
+    "category": "workspace",
+    "difficulty": "easy",
+    "instruction": "Switch to workspace 3.",
+    "setup": [],
+    "oracle": [
+      "hyprctl dispatch workspace 3"
+    ],
+    "verify": [
+      "hb_assert_activeworkspace '.id == 3'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "ws-rename",
+    "category": "workspace",
+    "difficulty": "medium",
+    "instruction": "Rename workspace 1 to 'code'.",
+    "setup": [],
+    "oracle": [
+      "hyprctl dispatch renameworkspace '1 code'"
+    ],
+    "verify": [
+      "hb_assert_workspaces 'any(.[]; .id == 1 and .name == \"code\")'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "ws-special-scratch",
+    "category": "workspace",
+    "difficulty": "medium",
+    "instruction": "Move the window titled 'Target' to a special workspace named 'scratch'.",
+    "setup": [
+      "hb_spawn Target"
+    ],
+    "oracle": [
+      "hyprctl dispatch movetoworkspacesilent 'special:scratch,title:^(Target)$'"
+    ],
+    "verify": [
+      "hb_assert_client Target '.workspace.name == \"special:scratch\"'"
+    ],
+    "timeout": 60
+  }
+]

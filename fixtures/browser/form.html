@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- hyperbench browser fixture: every hazard here is one we hit in the wild.
+     Framework-free on purpose, so oracle scripts can set .value directly. -->
+<html>
+<head><meta charset="utf-8"><title>account setup</title></head>
+<body>
+  <h1>account setup</h1>
+
+  <!-- hazard 1: prefilled field. Typing without clearing yields
+       "user_2847wisp", which the verifier rejects. -->
+  <label for="username">username</label>
+  <input id="username" name="username" value="user_2847" autocomplete="off">
+
+  <!-- hazard 2: delayed-enable button (anti-clickjack pattern).
+       Clicking while disabled does nothing, silently. -->
+  <button id="authorize" disabled>authorize</button>
+
+  <!-- hazard 3: the obvious-looking decoy that must NOT be clicked. -->
+  <button id="reset">reset form</button>
+
+  <p><a id="continue" href="done.html">continue</a></p>
+
+  <script>
+    window.__authorized = false;
+    window.__reset = false;
+    setTimeout(() => {
+      document.getElementById('authorize').disabled = false;
+    }, 3000);
+    document.getElementById('authorize').addEventListener('click', () => {
+      window.__authorized = true;
+      document.title = 'authorized';
+    });
+    document.getElementById('reset').addEventListener('click', () => {
+      window.__reset = true;
+      document.getElementById('username').value = '';
+    });
+  </script>
+</body>
+</html>

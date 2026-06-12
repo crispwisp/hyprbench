@@ -1,0 +1,30 @@
+[
+  {
+    "id": "cfg-gaps",
+    "category": "config",
+    "difficulty": "medium",
+    "instruction": "Set the inner gaps (general:gaps_in) to 20 at runtime.",
+    "setup": [],
+    "oracle": [
+      "hyprctl keyword general:gaps_in 20"
+    ],
+    "verify": [
+      "hb_assert_option general:gaps_in '(.custom | split(\" \") | map(select(length > 0)) | .[0]) == \"20\"'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "cfg-border-size",
+    "category": "config",
+    "difficulty": "medium",
+    "instruction": "Set the window border size to 5 pixels at runtime.",
+    "setup": [],
+    "oracle": [
+      "hyprctl keyword general:border_size 5"
+    ],
+    "verify": [
+      "hb_assert_option general:border_size '.int == 5'"
+    ],
+    "timeout": 60
+  }
+]

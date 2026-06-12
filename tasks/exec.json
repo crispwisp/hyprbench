@@ -1,0 +1,32 @@
+[
+  {
+    "id": "exec-terminal",
+    "category": "exec",
+    "difficulty": "easy",
+    "instruction": "Open a terminal window.",
+    "setup": [],
+    "oracle": [
+      "hyprctl dispatch exec -- 'alacritty --class hyprbench -e sleep 1000'",
+      "hb_wait_count 1"
+    ],
+    "verify": [
+      "hb_assert_new 'true' '>= 1'"
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "exec-terminal-class",
+    "category": "exec",
+    "difficulty": "easy",
+    "instruction": "Open a terminal window whose window class (app id) is exactly 'benchterm'.",
+    "setup": [],
+    "oracle": [
+      "hyprctl dispatch exec -- 'alacritty --class benchterm -e sleep 1000'",
+      "hb_wait_count 1"
+    ],
+    "verify": [
+      "hb_assert_new '.class == \"benchterm\"' '>= 1'"
+    ],
+    "timeout": 60
+  }
+]
