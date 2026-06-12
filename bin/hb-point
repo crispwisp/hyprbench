@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# hb-point - inject real pointer input into the bench compositor.
+# For vision-track agents: coordinates are absolute compositor/screenshot
+# pixels (the same frame hb-look captures; fixtures expose __cv.rect to map
+# page CSS px <-> screen px).
+#
+# Usage:
+#   hb-point click X Y  [--button left|right|middle]
+#   hb-point move  X Y
+#   hb-point drag  X1 Y1 X2 Y2 [--steps N] [--delay-ms M] [--button B]
+#
+# Drags interpolate N intermediate moves (default 12, 15ms apart) so
+# pointermove listeners see a hand-like gesture, not a teleport.
+# Backend: lib/vpointer.py speaking wlr-virtual-pointer directly (wlrctl
+# cannot hold a button, which drags require).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# resolve the bench display, same logic as hb-look
+wd=${HB_WAYLAND_DISPLAY:-}
+if [[ -z $wd && -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+    wd=$(cat "$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hb_wayland_display" 2>/dev/null || true)
+fi
+wd=${wd:-${WAYLAND_DISPLAY:-}}
+[[ -n $wd ]] || { echo "hb-point: cannot determine bench WAYLAND_DISPLAY" >&2; exit 1; }
+
+# output extents for absolute motion (bench.conf pins scale=1)
+extent=$(hyprctl -j monitors 2>/dev/null |
+    jq -r 'first | "\(.width)x\(.height)"') ||
+    { echo "hb-point: cannot read monitor extents via hyprctl" >&2; exit 1; }
+
+cmd=${1:-}
+shift || true
+pos=()
+button=left steps=12 delay=15
+while (($#)); do
+    case $1 in
+    --button) button=${2:?--button requires a value}; shift 2 ;;
+    --steps) steps=${2:?--steps requires a value}; shift 2 ;;
+    --delay-ms) delay=${2:?--delay-ms requires a value}; shift 2 ;;
+    *) pos+=("$1"); shift ;;
+    esac
+done
+
+ops=()
+case $cmd in
+move)
+    ops=(move "${pos[0]}" "${pos[1]}")
+    ;;
+click)
+    ops=(move "${pos[0]}" "${pos[1]}" sleep 30
+        press "$button" sleep 40 release "$button")
+    ;;
+drag)
+    x1=${pos[0]} y1=${pos[1]} x2=${pos[2]} y2=${pos[3]}
+    ops=(move "$x1" "$y1" sleep 40 press "$button" sleep 40)
+    for ((s = 1; s <= steps; s++)); do
+        ops+=(move "$((x1 + (x2 - x1) * s / steps))" \
+            "$((y1 + (y2 - y1) * s / steps))" sleep "$delay")
+    done
+    ops+=(sleep 40 release "$button")
+    ;;
+*)
+    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac
+
+exec env HB_WAYLAND_DISPLAY="$wd" python3 "$ROOT/lib/vpointer.py" \
+    --extent "$extent" "${ops[@]}"

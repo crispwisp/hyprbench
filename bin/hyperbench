@@ -266,7 +266,7 @@ run)
 doctor)
     # Check dependencies and the vision pipeline against a throwaway instance.
     ok=1
-    for dep in Hyprland hyprctl jq alacritty grim chafa tesseract; do
+    for dep in Hyprland hyprctl jq alacritty grim chafa tesseract python3; do
         if command -v "$dep" >/dev/null; then echo "ok   $dep"; else echo "MISS $dep"; ok=0; fi
     done
     echo "--- vision pipeline ---"

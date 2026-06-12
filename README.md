@@ -30,7 +30,7 @@ modality available to the model**, not tool access. Both tracks have full
 | Track (`--track`) | Sees pixels? | Notes |
 |-------------------|--------------|-------|
 | `headless` | no | May screenshot and convert to *text* (`hb-look --text` ASCII via chafa, `hb-look --ocr` via tesseract) — but images must never reach the model. |
-| `vision` | yes | May look at the desktop whenever it wants: `hb-look` captures a PNG of the bench instance for direct viewing. |
+| `vision` | yes | May look at the desktop whenever it wants: `hb-look` captures a PNG of the bench instance for direct viewing. May act at screen coordinates with `hb-point` (click / move / drag with hand-like interpolated motion). |
 
 Select with `--track headless` (default) or `--track vision`. The track is an
 honor-system contract enforced by the agent adapter (e.g. the headless Claude
@@ -139,6 +139,10 @@ An agent is any executable. It gets:
 | `HYPRLAND_INSTANCE_SIGNATURE` | routes plain `hyprctl` to the bench instance |
 
 `hb-look` is on `PATH` in both tracks (text modes only in headless).
+`hb-point` injects real pointer input (wlr-virtual-pointer, spoken directly by
+`lib/vpointer.py` — zero deps; wlrctl cannot hold a button, which drags
+require). Coordinates are compositor/screenshot pixels; canvas fixtures
+expose `__cv.rect` for page↔screen mapping.
 
 Exit when done; the runner verifies afterwards.
 
