@@ -151,6 +151,19 @@ Earned during hyprbench development, each by a real incident:
   1-task suite. One file descriptor, two mysteries. Children inside read
   loops get `< /dev/null`, always; probes must run *inside* the loop
   machinery, because a clean-stdin reproduction outside it proves nothing.
+- **Nested mode structurally cannot surface bystander bugs.** A directional
+  `swapwindow` oracle was green nested and red host with identical code: no
+  foreign windows exist in a fresh instance, so nothing can sit between your
+  targets and intercept the operation. Same task, same oracle, and the red
+  was the truth. Geometry-not-direction is the robust idiom for spatial
+  operations in shared sessions — and host-mode validation is not optional,
+  it is the only place an entire bug class is visible.
+- **Failure does not stop the flow — in pipes or in command chains.** Twin
+  incidents: a child reading stdin ate the rest of a while-read loop, and a
+  compound git command whose merge step failed still executed its push.
+  Both are the same shape: things keep flowing past the point you assumed
+  everything stopped. Children get `</dev/null`; remote-acting steps get
+  their own single-purpose commands.
 - **Steam keeps shared mutable state in `~/.steam`** regardless of which
   compositor instance it renders in — steam tasks must never run
   concurrently with each other, and a bootstrapped steam answers CDP on
