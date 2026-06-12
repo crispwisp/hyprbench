@@ -1,0 +1,62 @@
+[
+  {
+    "id": "wo-triangle",
+    "category": "winorg",
+    "difficulty": "medium",
+    "instruction": "Arrange the three windows on this workspace in a triangle: one window centered on top, the other two below it side by side (left and right).",
+    "setup": [
+      "hb_spawn TriA",
+      "hb_spawn TriB",
+      "hb_spawn TriC"
+    ],
+    "oracle": [
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "hb_place TriA $((W/2 - W/8)) $((H/12)) $((W/4)) $((H/4))",
+      "hb_place TriB $((W/8)) $((H/2)) $((W/4)) $((H/4))",
+      "hb_place TriC $((W - W/8 - W/4)) $((H/2)) $((W/4)) $((H/4))"
+    ],
+    "verify": [
+      "hb_assert_layout_triangle owned"
+    ],
+    "timeout": 90
+  },
+  {
+    "id": "wo-grid-2x2-tiled",
+    "category": "winorg",
+    "difficulty": "hard",
+    "instruction": "Open four terminal windows on this workspace and arrange them as a 2 by 2 grid using native tiling - no window may be floating.",
+    "setup": [],
+    "oracle": [
+      "hb_spawn GridA",
+      "hyprctl dispatch layoutmsg 'preselect r'",
+      "hb_spawn GridB",
+      "hyprctl dispatch focuswindow 'title:^(GridA)$'",
+      "hyprctl dispatch layoutmsg 'preselect d'",
+      "hb_spawn GridC",
+      "hyprctl dispatch focuswindow 'title:^(GridB)$'",
+      "hyprctl dispatch layoutmsg 'preselect d'",
+      "hb_spawn GridD"
+    ],
+    "verify": [
+      "hb_assert_layout_grid 2 2 tiled new"
+    ],
+    "timeout": 120
+  },
+  {
+    "id": "wo-grid-3x3",
+    "category": "winorg",
+    "difficulty": "hard",
+    "instruction": "Arrange the nine windows on this workspace into a 3 by 3 grid covering the screen. Floating windows are allowed; the grid allocation must be correct (three columns, three rows, one window per cell).",
+    "setup": [
+      "for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_spawn $t; done"
+    ],
+    "oracle": [
+      "read -r W H < <(hyprctl -j monitors | jq -r 'first | \"\\(.width) \\(.height)\"')",
+      "i=0; for t in N1 N2 N3 N4 N5 N6 N7 N8 N9; do hb_place $t $(( (i%3)*W/3 + 8 )) $(( (i/3)*H/3 + 8 )) $((W/3 - 16)) $((H/3 - 16)); i=$((i+1)); done"
+    ],
+    "verify": [
+      "hb_assert_layout_grid 3 3 any owned"
+    ],
+    "timeout": 150
+  }
+]

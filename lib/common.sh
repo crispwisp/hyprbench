@@ -135,6 +135,25 @@ hb_spawn() {
     hb_wait_title "$title" 15
 }
 
+# hb_spawn_shell TITLE CWD [CLASS] - spawn a terminal running an interactive
+# shell in CWD. For tasks that need real shells (termtopo: CWD is read back
+# via /proc/PID/cwd of the shell). hb_spawn stays inert (sleep) by design.
+hb_spawn_shell() {
+    local title=$1 cwd=$2 class=${3:-hyprbench}
+    mkdir -p "$cwd"
+    hyprctl dispatch exec -- \
+        "$HB_TERMINAL --class $class --title $title --working-directory $cwd -e bash --norc --noprofile" >/dev/null
+    hb_wait_title "$title" 15
+}
+
+# hb_place TITLE X Y W H - float a window and pin exact geometry.
+hb_place() {
+    local t=$1 x=$2 y=$3 w=$4 h=$5
+    hyprctl dispatch setfloating "title:^($t)$" >/dev/null
+    hyprctl dispatch resizewindowpixel "exact $w $h,title:^($t)$" >/dev/null
+    hyprctl dispatch movewindowpixel "exact $x $y,title:^($t)$" >/dev/null
+}
+
 # hb_wait_title TITLE [TIMEOUT] - wait until a client with TITLE exists.
 hb_wait_title() {
     local t=$1 timeout=${2:-10} i
@@ -262,4 +281,98 @@ hb_assert_near() {
 # Example: hb_assert_option general:border_size '.int == 5'
 hb_assert_option() {
     hyprctl -j getoption "$1" | jq -e "$2" >/dev/null
+}
+
+# --- answer channel (query tasks) -------------------------------------------
+# The runner exports HB_ANSWER_FILE; agents write their bare answer to it.
+
+hb_assert_answer_exact() { # EXPECTED - whitespace-trimmed comparison
+    local got
+    got=$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$HB_ANSWER_FILE" 2>/dev/null | head -1)
+    [[ $got == "$1" ]]
+}
+
+hb_assert_answer_regex() { # ERE
+    grep -Eq "$1" "$HB_ANSWER_FILE" 2>/dev/null
+}
+
+hb_assert_answer_num() { # EXPECTED [TOL] - first number in the answer
+    local exp=$1 tol=${2:-0} n
+    n=$(grep -Eo -m1 '[-+]?[0-9]+([.][0-9]+)?' "$HB_ANSWER_FILE" 2>/dev/null | head -1)
+    [[ -n $n ]] || return 1
+    jq -ne --argjson n "$n" --argjson e "$exp" --argjson t "$tol" \
+        '(($n - $e) | if . < 0 then -. else . end) <= $t' >/dev/null
+}
+
+# --- layout predicates (winorg tasks) ----------------------------------------
+# Geometry math over the clients on the ACTIVE workspace. Canonical
+# predicates with cell-relative tolerances, not pixel-perfection.
+
+# centers of mapped clients on the active workspace, as a jq array.
+# SCOPE keeps host-mode clutter out of the math (a leaked window on the live
+# session must not break a geometry predicate):
+#   all   - every client on the workspace (default; nested-mode safe)
+#   owned - only bench-owned classes (tasks that arrange setup-spawned windows)
+#   new   - only clients not in HB_BASELINE (tasks where the agent opens them)
+hb__ws_centers() {
+    local scope=${1:-all} ws
+    ws=$(hyprctl -j activeworkspace | jq '.id')
+    case $scope in
+    owned)
+        hyprctl -j clients | jq --argjson ws "$ws" --arg re "$HB_OWNED_CLASSES" \
+            '[.[] | select(.workspace.id == $ws and .mapped != false and (.class | test($re)))
+              | {x: (.at[0] + .size[0]/2), y: (.at[1] + .size[1]/2), fl: .floating}]'
+        ;;
+    new)
+        hyprctl -j clients | jq --argjson ws "$ws" --slurpfile base "$HB_BASELINE" \
+            '[$base[0][].address] as $known
+             | [.[] | select(.workspace.id == $ws and .mapped != false
+                 and (.address as $a | $known | index($a) | not))
+               | {x: (.at[0] + .size[0]/2), y: (.at[1] + .size[1]/2), fl: .floating}]'
+        ;;
+    *)
+        hyprctl -j clients | jq --argjson ws "$ws" \
+            '[.[] | select(.workspace.id == $ws and .mapped != false)
+              | {x: (.at[0] + .size[0]/2), y: (.at[1] + .size[1]/2), fl: .floating}]'
+        ;;
+    esac
+}
+
+# hb_assert_layout_triangle [SCOPE] - exactly 3 windows: one apex clearly
+# above two bases; bases split left/right at roughly the same height; apex x
+# between the bases.
+hb_assert_layout_triangle() {
+    local scope=${1:-all} mon
+    mon=$(hyprctl -j monitors | jq 'first | {w: .width, h: .height}')
+    hb__ws_centers "$scope" | jq -e --argjson m "$mon" '
+        length == 3 and (
+            sort_by(.y) as $s
+            | $s[0] as $apex | ($s[1:] | sort_by(.x)) as $b
+            | ($m.w / 8) as $tx | ($m.h / 8) as $ty
+            | ($apex.y < $b[0].y - $ty) and ($apex.y < $b[1].y - $ty)
+            and (($b[1].x - $b[0].x) > $tx)
+            and ((($b[0].y - $b[1].y) | if . < 0 then -. else . end) <= ($m.h / 6))
+            and ($apex.x >= $b[0].x - $tx) and ($apex.x <= $b[1].x + $tx)
+        )' >/dev/null
+}
+
+# hb_assert_layout_grid N M [tiled] [SCOPE] - exactly N*M windows
+# partitioning the screen into N columns x M rows: sorted-by-x centers chunk
+# into N column groups of M with small x-spread, and row heights align across
+# columns. With "tiled", every window must also be non-floating.
+hb_assert_layout_grid() {
+    local n=$1 m=$2 tiled=${3:-any} scope=${4:-all} mon
+    mon=$(hyprctl -j monitors | jq 'first | {w: .width, h: .height}')
+    hb__ws_centers "$scope" | jq -e --argjson m_ "$mon" --argjson N "$n" --argjson M "$m" \
+        --arg tiled "$tiled" '
+        def chunk(s): [range(0; length; s)] as $is | [$is[] as $i | .[$i:$i+s]];
+        ($m_.w / $N / 3) as $tx | ($m_.h / $M / 3) as $ty
+        | length == ($N * $M)
+        and (($tiled != "tiled") or all(.[]; .fl == false))
+        and ((sort_by(.x) | chunk($M)) as $cols
+            | all($cols[]; (map(.x) | max - min) <= $tx)
+            and ([$cols[] | sort_by(.y)] as $sorted
+                | all(range(0; $M);
+                    . as $r | [$sorted[] | .[$r].y] | (max - min) <= $ty)))
+        ' >/dev/null
 }

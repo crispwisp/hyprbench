@@ -64,6 +64,9 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
     # run's track. validate passes 0 - oracles prove verifier soundness via
     # IPC/CDP regardless of observation modality, so every task validates.
     local gate_tracks=${8:-1}
+    # allow_mutates=1: run tasks marked "mutates": true (real system changes,
+    # e.g. package installs). Default-deny: they SKIP unless explicitly allowed.
+    local allow_mutates=${9:-0}
     local pass=0 fail=0 errors=0 total=0 skipped=0
 
     if [[ $mode == "host" && -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
@@ -104,6 +107,18 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
                     >>"$outfile"
                 continue
             fi
+        fi
+
+        # mutates gate: tasks that change the real system (installs etc.)
+        # never run without explicit consent - not even in validate.
+        if [[ $(jq -r '.mutates // false' <<<"$task") == "true" && $allow_mutates != 1 ]]; then
+            skipped=$((skipped + 1))
+            echo "SKIP  (mutates system: pass --allow-mutates in a disposable environment)"
+            jq -nc --arg id "$id" --arg agent "$label" \
+                --arg track "$track" --arg mode "$mode" \
+                '{task:$id, track:$track, mode:$mode, status:"skip", reason:"mutates", agent:$agent}' \
+                >>"$outfile"
+            continue
         fi
 
         # dependency gate: a task may declare "requires": ["node", ...].
@@ -151,6 +166,11 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
         export HB_BASELINE="$logdir/baseline-$id.json"
         echo '[]' >"$HB_BASELINE"
 
+        # answer channel: query tasks have the agent write its bare answer
+        # here; verifiers assert it (hb_assert_answer_*)
+        export HB_ANSWER_FILE="$logdir/answer-$id.txt"
+        : >"$HB_ANSWER_FILE"
+
         # setup
         local setup
         mapfile -t setup < <(jq -r '.setup[]? // empty' <<<"$task")
@@ -172,6 +192,7 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
             local agent_env=(
                 HB_INSTRUCTION="$instr" HB_TASK_ID="$id" HB_TASK_FILE="$taskfile"
                 HB_TRACK="$track" HB_BASELINE="$HB_BASELINE"
+                HB_ANSWER_FILE="$HB_ANSWER_FILE"
                 HYPRLAND_INSTANCE_SIGNATURE="$sig"
                 PATH="$ROOT/bin:$PATH"
             )
@@ -241,7 +262,7 @@ list)
         awk -F'\t' 'BEGIN{printf "%-28s %-10s %s\n","TASK","CATEGORY","DIFFICULTY"}{printf "%-28s %-10s %s\n",$1,$2,$3}'
     ;;
 run)
-    agent="" filter="" label="" tmo="" track="headless" mode="nested"
+    agent="" filter="" label="" tmo="" track="headless" mode="nested" mutates=0
     while (($#)); do
         case $1 in
         --agent) agent=${2:?--agent requires a value}; shift 2 ;;
@@ -250,6 +271,7 @@ run)
         --timeout) tmo=${2:?--timeout requires a value}; shift 2 ;;
         --track) track=${2:?--track requires a value}; shift 2 ;;
         --mode) mode=${2:?--mode requires a value}; shift 2 ;;
+        --allow-mutates) mutates=1; shift ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
         esac
     done
@@ -261,7 +283,7 @@ run)
     label=${label:-$(basename "$agent" .sh)}
     run_suite "$agent" "$filter" "$label" "$tmo" \
         "$RESULTS_DIR/$(date +%Y%m%d-%H%M%S)-$$-$mode-$track-$label/results.jsonl" \
-        "$track" "$mode"
+        "$track" "$mode" 1 "$mutates"
     ;;
 doctor)
     # Check dependencies and the vision pipeline against a throwaway instance.
@@ -291,20 +313,21 @@ doctor)
 validate)
     # Oracle must pass every task; noop must pass none. Anything else means
     # the harness or a task definition is broken.
-    mode="nested"
+    mode="nested" mutates=0
     while (($#)); do
         case $1 in
         --mode) mode=${2:?--mode requires a value}; shift 2 ;;
+        --allow-mutates) mutates=1; shift ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
         esac
     done
     dir="$RESULTS_DIR/$(date +%Y%m%d-%H%M%S)-$$-validate-$mode"
     echo "--- oracle (every task should PASS) ---"
-    run_suite "$ROOT/agents/oracle.sh" "" "oracle" "" "$dir/oracle.jsonl" headless "$mode" 0
+    run_suite "$ROOT/agents/oracle.sh" "" "oracle" "" "$dir/oracle.jsonl" headless "$mode" 0 "$mutates"
     op=$REPLY_PASS ot=$REPLY_TOTAL
     echo
     echo "--- noop (every task should FAIL) ---"
-    run_suite "$ROOT/agents/noop.sh" "" "noop" "" "$dir/noop.jsonl" headless "$mode" 0
+    run_suite "$ROOT/agents/noop.sh" "" "noop" "" "$dir/noop.jsonl" headless "$mode" 0 "$mutates"
     np=$REPLY_PASS nt=$REPLY_TOTAL
     echo
     if [[ $op -eq $ot && $np -eq 0 ]]; then

@@ -125,7 +125,8 @@
     "instruction": "Resize the floating window titled 'Target' to 800 by 600 pixels.",
     "setup": [
       "hb_spawn Target",
-      "hyprctl dispatch setfloating 'title:^(Target)$'"
+      "hyprctl dispatch setfloating 'title:^(Target)$'",
+      "hyprctl dispatch resizewindowpixel 'exact 500 400,title:^(Target)$'"
     ],
     "oracle": [
       "hyprctl dispatch resizewindowpixel 'exact 800 600,title:^(Target)$'"

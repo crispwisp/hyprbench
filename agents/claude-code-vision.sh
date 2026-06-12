@@ -14,6 +14,8 @@ VISION TRACK: you may look at the desktop at any time by running 'hb-look',
 which captures a screenshot and prints the PNG path - then view that file
 with the Read tool. Look whenever it helps you ground or verify your actions.
 
+If the task asks a question, write the bare answer (no prose) to the file
+\$HB_ANSWER_FILE (already exported).
 After acting, verify the state actually changed before finishing.
 
 TASK: $HB_INSTRUCTION" \

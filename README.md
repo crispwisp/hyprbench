@@ -22,7 +22,7 @@ verification reads structured compositor state instead of pixels.
 
 ## Tracks
 
-The same 19 tasks run under two tracks; the difference is the **observation
+The same task suite runs under two tracks; the difference is the **observation
 modality available to the model**, not tool access. Both tracks have full
 `hyprctl` IPC access. Scores are reported as **hyperbench_headless** and
 **hyperbench_vision**.
@@ -69,7 +69,7 @@ For every task the runner:
 ## Usage
 
 ```sh
-bin/hyperbench list                              # show the 19 tasks
+bin/hyperbench list                              # show all tasks (authoritative)
 bin/hyperbench doctor                            # dependency + vision pipeline check
 bin/hyperbench validate                          # oracle must pass all, noop none
 bin/hyperbench validate --mode host              # same, against the live session
@@ -81,7 +81,8 @@ bin/hyperbench run --agent agents/oracle.sh --task win-float
 
 ## Tasks
 
-19 tasks in `tasks/*.json`, grouped by category:
+Tasks live in `tasks/*.json`, grouped by category (`bin/hyperbench list` is
+authoritative):
 
 | Category  | Tasks | Examples |
 |-----------|-------|----------|
@@ -90,6 +91,14 @@ bin/hyperbench run --agent agents/oracle.sh --task win-float
 | exec      | 2     | launch terminal, launch with given class |
 | config    | 2     | runtime gaps / border via `hyprctl keyword` |
 | multi     | 3     | multi-step arrangements and selective cleanup |
+| browser   | 3     | form/DOM tasks over CDP against hermetic `file://` fixtures |
+| canvas    | 4     | pointer-skill tasks on canvas2d (vision track): click target, drag slider, connect dots, drop shape |
+| winorg    | 3     | spatial arrangement verified by geometry math: triangle, native-tiled 2×2, 3×3 grid |
+
+Planned (see collaboration scope): `query` (natural-language questions
+answered by using the system), `apps` (real GUI apps with deterministic
+verification hooks: mpv IPC, Steam CEF), `install` (real package operations,
+`mutates`-gated), `termtopo` (terminal↔tmux topology transforms).
 
 Task schema:
 
@@ -123,6 +132,20 @@ all tracks). Scored runs SKIP (unscored) tasks whose tracks exclude the run's
 `--track`; `validate` ignores track gating, because oracles prove verifier
 soundness via IPC/CDP regardless of observation modality — every task
 validates on every machine that has its `requires`.
+
+A task that changes the real system (package installs etc.) must declare
+`"mutates": true`. Mutating tasks SKIP by default — even under `validate` —
+and run only with the explicit `--allow-mutates` flag, in an environment you
+can afford to lose.
+
+**Answer channel**: the runner exports `HB_ANSWER_FILE`; query-style tasks
+have the agent write its bare answer there, and verifiers assert it with
+`hb_assert_answer_exact` / `hb_assert_answer_regex` / `hb_assert_answer_num
+EXPECTED [TOL]`.
+
+**Layout predicates**: winorg verifiers use geometry math over `hyprctl -j
+clients` — `hb_assert_layout_triangle`, `hb_assert_layout_grid N M [tiled]` —
+with cell-relative tolerances, not pixel-perfection.
 
 ## Writing an agent
 

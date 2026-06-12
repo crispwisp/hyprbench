@@ -13,6 +13,8 @@ plain 'hyprctl' command targets the correct instance - never unset or change it.
 Inspect state with 'hyprctl -j clients / workspaces / activewindow / getoption'.
 Act with 'hyprctl dispatch ...' and 'hyprctl keyword ...'. To open terminal
 windows use: hyprctl dispatch exec -- 'alacritty --class hyprbench --title NAME -e sleep 1000'.
+If the task asks a question, write the bare answer (no prose) to the file
+\$HB_ANSWER_FILE (already exported).
 After acting, verify the state actually changed before finishing.
 
 TASK: $HB_INSTRUCTION" \
