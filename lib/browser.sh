@@ -22,6 +22,13 @@ hb_browser_launch() {
         echo "hb_browser_launch: cannot resolve browser '$HB_BROWSER'" >&2
         return 1
     }
+    # refuse to launch when something else already owns the CDP port —
+    # otherwise every hb_cdp_eval silently talks to the WRONG browser while
+    # input goes to the right window (observed; cost four debugging rounds)
+    if curl -s -m 1 "http://127.0.0.1:$HB_CDP_PORT/json/version" >/dev/null 2>&1; then
+        echo "hb_browser_launch: port $HB_CDP_PORT already owned by another CDP endpoint — kill it or set HB_CDP_PORT" >&2
+        return 1
+    fi
     [[ -n ${1:-} ]] && url="file://${HB_ROOT:-$PWD}/fixtures/browser/$1"
     HB_BROWSER_PROFILE=$(mktemp -d "${TMPDIR:-/tmp}/hb-browser.XXXXXX")
     # exec via the compositor so the window maps inside the bench instance
@@ -41,9 +48,16 @@ hb_browser_launch() {
 hb_browser_kill() {
     # kill by profile dir when we know it, else by our debugging port —
     # also makes this safe as a setup preamble to sweep a previous task's browser
+    local i
     if [[ -n ${HB_BROWSER_PROFILE:-} ]]; then
         pkill -f -- "--user-data-dir=$HB_BROWSER_PROFILE" 2>/dev/null || true
-        rm -rf "$HB_BROWSER_PROFILE"
+        # chromium keeps writing the profile while dying — wait it out, then
+        # retry the rm (a racing write can resurrect a dir mid-removal)
+        for ((i = 0; i < 25; i++)); do
+            pgrep -f -- "--user-data-dir=$HB_BROWSER_PROFILE" >/dev/null 2>&1 || break
+            sleep 0.2
+        done
+        rm -rf "$HB_BROWSER_PROFILE" 2>/dev/null || { sleep 0.5; rm -rf "$HB_BROWSER_PROFILE"; }
     else
         pkill -f -- "--remote-debugging-port=$HB_CDP_PORT" 2>/dev/null || true
     fi
