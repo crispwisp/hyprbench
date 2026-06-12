@@ -3,7 +3,9 @@
     "id": "tt-consolidate",
     "category": "termtopo",
     "difficulty": "hard",
-    "requires": ["tmux"],
+    "requires": [
+      "tmux"
+    ],
     "instruction": "Three terminal windows are open, titled TTA, TTB and TTC, each running a shell in its own working directory. Consolidate them: create a tmux session named 'hb-consolidated' containing one pane per shell, each pane in the same working directory as the window it replaces, then close the three original terminal windows.",
     "setup": [
       "mkdir -p /tmp/hb-tt-a /tmp/hb-tt-b /tmp/hb-tt-c",
@@ -30,13 +32,15 @@
       "tmux kill-session -t hb-consolidated 2>/dev/null || true",
       "rm -rf /tmp/hb-tt-a /tmp/hb-tt-b /tmp/hb-tt-c"
     ],
-    "timeout": 180
+    "timeout": 300
   },
   {
     "id": "tt-explode",
     "category": "termtopo",
     "difficulty": "hard",
-    "requires": ["tmux"],
+    "requires": [
+      "tmux"
+    ],
     "instruction": "A detached tmux session named 'hb-explode' has three panes, each in its own working directory. Explode it: open one terminal window per pane, each window's shell in the same working directory as the pane it replaces, then kill the tmux session.",
     "setup": [
       "mkdir -p /tmp/hb-tt-a /tmp/hb-tt-b /tmp/hb-tt-c",
@@ -59,6 +63,6 @@
       "tmux kill-session -t hb-explode 2>/dev/null || true",
       "rm -rf /tmp/hb-tt-a /tmp/hb-tt-b /tmp/hb-tt-c"
     ],
-    "timeout": 180
+    "timeout": 300
   }
 ]

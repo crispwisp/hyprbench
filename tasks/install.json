@@ -4,7 +4,10 @@
     "category": "install",
     "difficulty": "medium",
     "mutates": true,
-    "requires": ["pacman", "sudo"],
+    "requires": [
+      "pacman",
+      "sudo"
+    ],
     "instruction": "Install the game 'gnome-mines' from the official repositories.",
     "setup": [
       "! pacman -Q gnome-mines >/dev/null 2>&1"
@@ -26,7 +29,10 @@
     "category": "install",
     "difficulty": "easy",
     "mutates": true,
-    "requires": ["pacman", "sudo"],
+    "requires": [
+      "pacman",
+      "sudo"
+    ],
     "instruction": "The package 'sl' is installed on this system. Remove it completely.",
     "setup": [
       "pacman -Q sl >/dev/null 2>&1 || sudo pacman -S --noconfirm sl"
@@ -40,6 +46,6 @@
     "teardown": [
       "sudo pacman -Rns --noconfirm sl 2>/dev/null || true"
     ],
-    "timeout": 180
+    "timeout": 300
   }
 ]

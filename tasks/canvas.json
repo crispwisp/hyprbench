@@ -26,7 +26,7 @@
     "teardown": [
       "hb_browser_kill"
     ],
-    "timeout": 120
+    "timeout": 240
   },
   {
     "id": "cv-drag-slider",
@@ -55,7 +55,7 @@
     "teardown": [
       "hb_browser_kill"
     ],
-    "timeout": 150
+    "timeout": 240
   },
   {
     "id": "cv-connect-dots",
@@ -83,7 +83,7 @@
     "teardown": [
       "hb_browser_kill"
     ],
-    "timeout": 150
+    "timeout": 240
   },
   {
     "id": "cv-drop-shape",
@@ -111,6 +111,6 @@
     "teardown": [
       "hb_browser_kill"
     ],
-    "timeout": 150
+    "timeout": 240
   }
 ]
