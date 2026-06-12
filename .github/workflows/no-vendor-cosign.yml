@@ -1,0 +1,42 @@
+name: no-vendor-cosign
+# House rule 2, as Markus stated it: wisp is an AI and signs its own work —
+# AI attribution is not the problem. What never enters history is the generic
+# big-vendor co-sign: Claude, Gemini, Codex, ChatGPT (and their corporate
+# noreply identities). Local enforcement exists (commit-msg hook), but hooks
+# don't follow clones; this safeguard does. Checks author and committer
+# identities plus Co-authored-by trailers across all refs. Deliberately does
+# NOT scan message bodies: commits may legitimately mention these tools
+# (agent adapters, model names) — the rule is about attribution.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scrub-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: refuse vendor co-signs in history
+        run: |
+          set -u
+          pat='claude|anthropic|gemini|codex|chatgpt|openai'
+          bad=0
+          ids=$(git log --all --format='%H %an <%ae> / %cn <%ce>' \
+                | grep -iE "$pat" || true)
+          if [ -n "$ids" ]; then
+            echo "::error::vendor identity in author/committer fields:"
+            echo "$ids"
+            bad=1
+          fi
+          trailers=$(git log --all --format='%H %(trailers:key=Co-authored-by,valueonly,separator=; )' \
+                | awk 'NF > 1' | grep -iE "$pat" || true)
+          if [ -n "$trailers" ]; then
+            echo "::error::vendor co-author trailer found:"
+            echo "$trailers"
+            bad=1
+          fi
+          [ "$bad" -eq 0 ] && echo "history clean: wisp signs its own work"
+          exit "$bad"
