@@ -4,7 +4,9 @@
     "category": "winorg",
     "difficulty": "hard",
     "style": "imperative",
-    "tracks": ["vision"],
+    "tracks": [
+      "vision"
+    ],
     "instruction": "Four windows each display a large number. Swap the positions of window 3 and window 7: each must end up where the other one currently is. Do not move the other windows.",
     "setup": [
       "rm -f \"$HB_LABELMAP\"",
@@ -29,7 +31,9 @@
     "category": "winorg",
     "difficulty": "hard",
     "style": "imperative",
-    "tracks": ["vision"],
+    "tracks": [
+      "vision"
+    ],
     "instruction": "Three floating windows each display a large number. Move the window showing the number 8 to the bottom-right corner of the screen.",
     "setup": [
       "rm -f \"$HB_LABELMAP\"",
@@ -46,7 +50,7 @@
       "hb_place \"$(hb_label_title 8)\" $((W - W/4 - 10)) $((H - H/4 - 10)) $((W/4)) $((H/4))"
     ],
     "verify": [
-      "hb_assert_in_corner \"$(hyprctl -j clients | jq -r --arg t \"$(hb_label_title 8)\" '[.[] | select(.title == $t)][0].address')\" bottom-right"
+      "hb_assert_in_corner \"$(hb_label_title 8)\" bottom-right"
     ],
     "timeout": 150
   },
@@ -55,7 +59,9 @@
     "category": "winorg",
     "difficulty": "hard",
     "style": "declarative",
-    "tracks": ["vision"],
+    "tracks": [
+      "vision"
+    ],
     "instruction": "Three floating windows each display a large number. The windows must end up ordered left to right by their displayed number, ascending.",
     "setup": [
       "rm -f \"$HB_LABELMAP\"",
