@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- cv-drop-shape: drag the filled square into the outlined bin. Skill:
+     sustained drag of an object whose position tracks the pointer; success
+     means the square's CENTER ends inside the bin on release. -->
+<html>
+<head><meta charset="utf-8"><title>canvas bin</title>
+<style>body{margin:0;background:#222}canvas{display:block;margin:24px auto;background:#181818}</style>
+</head>
+<body>
+<canvas id="c" width="640" height="400"></canvas>
+<script src="cv-common.js"></script>
+<script>
+  const c = document.getElementById('c'), g = c.getContext('2d');
+  const rnd = cvRng();
+  const S = 44; // square side
+  const sq = { x: 50 + rnd() * 150, y: 50 + rnd() * 280 };       // top-left
+  const bin = { x: 400 + rnd() * 150, y: 50 + rnd() * 260, w: 110, h: 90 };
+
+  function draw() {
+    g.clearRect(0, 0, c.width, c.height);
+    g.strokeStyle = '#b3a6f0'; g.lineWidth = 3;
+    g.strokeRect(bin.x, bin.y, bin.w, bin.h);
+    g.fillStyle = '#8ef0d2';
+    g.fillRect(sq.x, sq.y, S, S);
+  }
+  draw();
+
+  // `square` is the live object — it tracks the drag, which the oracle needs
+  window.__cv.expect = { bin, side: S, square: sq };
+  window.__cv.result = { dropped: false, grabbed: false };
+
+  let grab = null; // pointer offset within the square
+  cvWire(c, (pt) => {
+    if (pt.x >= sq.x && pt.x <= sq.x + S && pt.y >= sq.y && pt.y <= sq.y + S) {
+      grab = { dx: pt.x - sq.x, dy: pt.y - sq.y };
+      window.__cv.result.grabbed = true;
+    }
+  });
+  c.addEventListener('pointermove', (e) => {
+    if (!grab) return;
+    const r = c.getBoundingClientRect();
+    sq.x = e.clientX - r.left - grab.dx;
+    sq.y = e.clientY - r.top - grab.dy;
+    draw();
+  });
+  addEventListener('pointerup', () => {
+    if (!grab) return;
+    const cx = sq.x + S / 2, cy = sq.y + S / 2;
+    window.__cv.result.dropped =
+      cx >= bin.x && cx <= bin.x + bin.w && cy >= bin.y && cy <= bin.y + bin.h;
+    grab = null;
+  });
+</script>
+</body>
+</html>

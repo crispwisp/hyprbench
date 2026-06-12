@@ -28,6 +28,7 @@ hb_browser_launch() {
     hyprctl dispatch exec -- \
         "$browser_bin --remote-debugging-port=$HB_CDP_PORT \
          --user-data-dir=$HB_BROWSER_PROFILE --no-first-run \
+         --force-device-scale-factor=1 \
          --disable-session-crashed-bubble $url" >/dev/null
     for ((i = 0; i < 75; i++)); do
         hb_cdp_eval 'true' >/dev/null 2>&1 && return 0
@@ -47,6 +48,30 @@ hb_browser_kill() {
         pkill -f -- "--remote-debugging-port=$HB_CDP_PORT" 2>/dev/null || true
     fi
     return 0
+}
+
+# hb_seed - per-task layout seed for seeded fixtures. Uses the runner's
+# HB_SEED when exported (reproducible runs); otherwise random per task so
+# layouts cannot be memorized.
+hb_seed() {
+    echo "${HB_SEED:-$((RANDOM % 100000 + 1))}"
+}
+
+# hb_pin_browser_geometry [W H X Y] - float the bench browser window and pin
+# exact geometry, so screenshot pixel coordinates are deterministic for the
+# vision track (pairs with --force-device-scale-factor=1 at launch).
+hb_pin_browser_geometry() {
+    local w=${1:-1000} h=${2:-700} x=${3:-100} y=${4:-50} i addr=""
+    for ((i = 0; i < 50; i++)); do
+        addr=$(hyprctl -j clients |
+            jq -r '[.[] | select(.class | test("chromium"; "i"))][0].address // empty')
+        [[ -n $addr ]] && break
+        sleep 0.2
+    done
+    [[ -n $addr ]] || { echo "hb_pin_browser_geometry: no browser window" >&2; return 1; }
+    hyprctl dispatch setfloating "address:$addr" >/dev/null
+    hyprctl dispatch resizewindowpixel "exact $w $h,address:$addr" >/dev/null
+    hyprctl dispatch movewindowpixel "exact $x $y,address:$addr" >/dev/null
 }
 
 # hb_cdp_eval EXPR - evaluate JS in the page, print the result as JSON.

@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- cv-connect-dots: draw a stroke from dot A to dot B. Skill: a press at
+     one coordinate, a sustained drag, a release at another. The stroke must
+     START inside A and END inside B — a click on each dot does not count. -->
+<html>
+<head><meta charset="utf-8"><title>canvas dots</title>
+<style>body{margin:0;background:#222}canvas{display:block;margin:24px auto;background:#181818}</style>
+</head>
+<body>
+<canvas id="c" width="640" height="400"></canvas>
+<script src="cv-common.js"></script>
+<script>
+  const c = document.getElementById('c'), g = c.getContext('2d');
+  const rnd = cvRng();
+  const R = 18;
+  const A = { x: 60 + rnd() * 200, y: 60 + rnd() * 280 };
+  let B;
+  do { B = { x: 380 + rnd() * 200, y: 60 + rnd() * 280 }; } while (cvDist(A, B) < 250);
+
+  function dot(p, label) {
+    g.beginPath(); g.arc(p.x, p.y, R, 0, 7);
+    g.fillStyle = '#8ef0d2'; g.fill();
+    g.fillStyle = '#181818'; g.font = 'bold 16px monospace';
+    g.fillText(label, p.x - 5, p.y + 6);
+  }
+  dot(A, 'A'); dot(B, 'B');
+
+  window.__cv.expect = { A, B, radius: R };
+  window.__cv.result = { connected: false, startedInA: false };
+
+  let stroke = null;
+  cvWire(c, (pt) => {
+    stroke = pt;
+    window.__cv.result.startedInA = cvDist(pt, A) <= R;
+    g.beginPath(); g.moveTo(pt.x, pt.y);
+    g.strokeStyle = '#b3a6f0'; g.lineWidth = 3;
+  });
+  c.addEventListener('pointermove', (e) => {
+    if (!stroke) return;
+    const r = c.getBoundingClientRect();
+    g.lineTo(e.clientX - r.left, e.clientY - r.top);
+    g.stroke();
+  });
+  addEventListener('pointerup', (e) => {
+    if (!stroke) return;
+    const r = c.getBoundingClientRect();
+    const end = { x: e.clientX - r.left, y: e.clientY - r.top };
+    if (window.__cv.result.startedInA && cvDist(end, B) <= R)
+      window.__cv.result.connected = true;
+    stroke = null;
+  });
+</script>
+</body>
+</html>

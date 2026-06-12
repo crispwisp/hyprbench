@@ -1,0 +1,116 @@
+[
+  {
+    "id": "cv-click-target",
+    "category": "canvas",
+    "difficulty": "medium",
+    "tracks": [
+      "vision"
+    ],
+    "requires": [
+      "node",
+      "chromium"
+    ],
+    "instruction": "A browser window titled 'canvas target' shows several circles on a dark canvas. Click the red circle. Avoid clicking the grey ones.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch \"canvas-target.html?seed=$(hb_seed)\"",
+      "hb_pin_browser_geometry"
+    ],
+    "oracle": [
+      "hb_cdp_eval '(()=>{const el=document.getElementById(\"c\"),r=el.getBoundingClientRect(),t=__cv.expect.target;el.dispatchEvent(new PointerEvent(\"pointerdown\",{clientX:r.left+t.x,clientY:r.top+t.y}));return __cv.result.hit})()'"
+    ],
+    "verify": [
+      "hb_assert_page 'window.__cv.result.hit' '. == true'",
+      "hb_assert_page 'window.__cv.result.missClicks' '. <= 1'"
+    ],
+    "teardown": [
+      "hb_browser_kill"
+    ],
+    "timeout": 120
+  },
+  {
+    "id": "cv-drag-slider",
+    "category": "canvas",
+    "difficulty": "hard",
+    "tracks": [
+      "vision"
+    ],
+    "requires": [
+      "node",
+      "chromium"
+    ],
+    "instruction": "A browser window titled 'canvas slider' shows a slider drawn on a canvas, with the current value and a 'set to' goal printed above it. Drag the knob until the value matches the goal, within 2.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch \"canvas-slider.html?seed=$(hb_seed)\"",
+      "hb_pin_browser_geometry"
+    ],
+    "oracle": [
+      "hb_cdp_eval '(()=>{const el=document.getElementById(\"c\"),r=el.getBoundingClientRect(),{goal,track}=__cv.expect;const y=r.top+track.y,sx=r.left+track.x+(__cv.result.value/100)*track.w,gx=r.left+track.x+(goal/100)*track.w;el.dispatchEvent(new PointerEvent(\"pointerdown\",{clientX:sx,clientY:y}));for(let i=1;i<=20;i++)el.dispatchEvent(new PointerEvent(\"pointermove\",{clientX:sx+(gx-sx)*i/20,clientY:y}));window.dispatchEvent(new PointerEvent(\"pointerup\",{clientX:gx,clientY:y}));return __cv.result.value})()'"
+    ],
+    "verify": [
+      "hb_assert_page '(()=>{const d=Math.abs(__cv.result.value-__cv.expect.goal);return d<=2})()' '. == true'",
+      "hb_assert_page 'window.__cv.result.grabbed' '. == true'"
+    ],
+    "teardown": [
+      "hb_browser_kill"
+    ],
+    "timeout": 150
+  },
+  {
+    "id": "cv-connect-dots",
+    "category": "canvas",
+    "difficulty": "hard",
+    "tracks": [
+      "vision"
+    ],
+    "requires": [
+      "node",
+      "chromium"
+    ],
+    "instruction": "A browser window titled 'canvas dots' shows two labelled dots, A and B, on a canvas. Draw a single stroke from inside dot A to inside dot B: press down on A, drag to B, release on B. Separate clicks on each dot do not count.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch \"canvas-dots.html?seed=$(hb_seed)\"",
+      "hb_pin_browser_geometry"
+    ],
+    "oracle": [
+      "hb_cdp_eval '(()=>{const el=document.getElementById(\"c\"),r=el.getBoundingClientRect(),{A,B}=__cv.expect;el.dispatchEvent(new PointerEvent(\"pointerdown\",{clientX:r.left+A.x,clientY:r.top+A.y}));for(let i=1;i<=20;i++)el.dispatchEvent(new PointerEvent(\"pointermove\",{clientX:r.left+A.x+(B.x-A.x)*i/20,clientY:r.top+A.y+(B.y-A.y)*i/20}));window.dispatchEvent(new PointerEvent(\"pointerup\",{clientX:r.left+B.x,clientY:r.top+B.y}));return __cv.result.connected})()'"
+    ],
+    "verify": [
+      "hb_assert_page 'window.__cv.result.connected' '. == true'"
+    ],
+    "teardown": [
+      "hb_browser_kill"
+    ],
+    "timeout": 150
+  },
+  {
+    "id": "cv-drop-shape",
+    "category": "canvas",
+    "difficulty": "hard",
+    "tracks": [
+      "vision"
+    ],
+    "requires": [
+      "node",
+      "chromium"
+    ],
+    "instruction": "A browser window titled 'canvas bin' shows a filled square and an outlined rectangular bin on a canvas. Drag the square so it ends up inside the bin, then release.",
+    "setup": [
+      "hb_browser_kill",
+      "hb_browser_launch \"canvas-bin.html?seed=$(hb_seed)\"",
+      "hb_pin_browser_geometry"
+    ],
+    "oracle": [
+      "hb_cdp_eval '(()=>{const el=document.getElementById(\"c\"),r=el.getBoundingClientRect(),{bin,side,square}=__cv.expect;const fx=r.left+square.x+side/2,fy=r.top+square.y+side/2,tx=r.left+bin.x+bin.w/2,ty=r.top+bin.y+bin.h/2;el.dispatchEvent(new PointerEvent(\"pointerdown\",{clientX:fx,clientY:fy}));for(let i=1;i<=20;i++)el.dispatchEvent(new PointerEvent(\"pointermove\",{clientX:fx+(tx-fx)*i/20,clientY:fy+(ty-fy)*i/20}));window.dispatchEvent(new PointerEvent(\"pointerup\",{clientX:tx,clientY:ty}));return __cv.result.dropped})()'"
+    ],
+    "verify": [
+      "hb_assert_page 'window.__cv.result.dropped' '. == true'"
+    ],
+    "teardown": [
+      "hb_browser_kill"
+    ],
+    "timeout": 150
+  }
+]

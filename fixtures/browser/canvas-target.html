@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- cv-click-target: one red circle among grey decoys, positions seeded.
+     Skill: find the target visually, click inside it. No DOM to query —
+     ground truth lives only in window.__cv.expect. -->
+<html>
+<head><meta charset="utf-8"><title>canvas target</title>
+<style>body{margin:0;background:#222}canvas{display:block;margin:24px auto;background:#181818}</style>
+</head>
+<body>
+<canvas id="c" width="640" height="400"></canvas>
+<script src="cv-common.js"></script>
+<script>
+  const c = document.getElementById('c'), g = c.getContext('2d');
+  const rnd = cvRng();
+  const R = 22, N = 6;
+  // place N circles, far enough apart that the target is unambiguous
+  const spots = [];
+  while (spots.length < N) {
+    const p = { x: 40 + rnd() * (c.width - 80), y: 40 + rnd() * (c.height - 80) };
+    if (spots.every((q) => cvDist(p, q) > R * 3)) spots.push(p);
+  }
+  const targetIdx = Math.floor(rnd() * N);
+  spots.forEach((p, i) => {
+    g.beginPath();
+    g.arc(p.x, p.y, R, 0, 7);
+    g.fillStyle = i === targetIdx ? '#e0443e' : '#5a5a5a';
+    g.fill();
+  });
+  window.__cv.expect = { target: spots[targetIdx], radius: R };
+  window.__cv.result = { hit: false, missClicks: 0 };
+  cvWire(c, (pt) => {
+    if (cvDist(pt, window.__cv.expect.target) <= R) window.__cv.result.hit = true;
+    else window.__cv.result.missClicks++;
+  });
+</script>
+</body>
+</html>
