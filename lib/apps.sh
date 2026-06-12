@@ -112,6 +112,62 @@ hb_steam_kill() {
     return 0
 }
 
+# --- rendered labels (vision-only window references) ------------------------
+# "Swap window 1 with window 6" is resolvable from hyprctl when the number is
+# in the title. These helpers render the number INSIDE the window instead,
+# with an opaque random title — the reference then exists only on screen,
+# which makes spatial-reference prompts vision-track-only by construction.
+# The digit→title mapping is recorded for verifiers in HB_LABELMAP. (An agent
+# reading that file is out of bounds; it is harness state, not desktop state.)
+
+HB_LABELMAP=${HB_LABELMAP:-${TMPDIR:-/tmp}/hb-labelmap}
+
+# hb_banner_digit N - print one large block-glyph digit (0-9) on stdout.
+hb_banner_digit() {
+    local rows
+    case $1 in
+        0) rows=("███" "█ █" "█ █" "█ █" "███") ;;
+        1) rows=(" █ " "██ " " █ " " █ " "███") ;;
+        2) rows=("███" "  █" "███" "█  " "███") ;;
+        3) rows=("███" "  █" "███" "  █" "███") ;;
+        4) rows=("█ █" "█ █" "███" "  █" "  █") ;;
+        5) rows=("███" "█  " "███" "  █" "███") ;;
+        6) rows=("███" "█  " "███" "█ █" "███") ;;
+        7) rows=("███" "  █" "  █" "  █" "  █") ;;
+        8) rows=("███" "█ █" "███" "█ █" "███") ;;
+        9) rows=("███" "█ █" "███" "  █" "███") ;;
+        *) echo "hb_banner_digit: want 0-9, got '$1'" >&2; return 1 ;;
+    esac
+    # scale 3x wide, 2x tall so it reads in a screenshot of a small window
+    local r line i ch
+    for r in "${rows[@]}"; do
+        line=""
+        for ((i = 0; i < ${#r}; i++)); do
+            ch=${r:i:1}
+            line+="$ch$ch$ch"
+        done
+        printf '%s\n%s\n' "$line" "$line"
+    done
+}
+
+# hb_spawn_label N [CLASS] - spawn a terminal rendering digit N as content,
+# titled with an opaque random string. Records "N TITLE" in HB_LABELMAP.
+hb_spawn_label() {
+    local n=$1 class=${2:-hblabel} bannerfile title
+    bannerfile=$(mktemp "${TMPDIR:-/tmp}/hb-label-XXXXXX")
+    hb_banner_digit "$n" >"$bannerfile" || { rm -f "$bannerfile"; return 1; }
+    title="hb-$(od -An -tx1 -N4 /dev/urandom | tr -d ' \n')"
+    hyprctl dispatch exec -- "$HB_TERMINAL --class $class --title $title \
+        -e bash -c 'clear; cat $bannerfile; sleep 1000'" >/dev/null
+    hb_wait_title "$title" 15 || return 1
+    echo "$n $title" >>"$HB_LABELMAP"
+}
+
+# hb_label_title N - print the window title behind rendered label N.
+hb_label_title() {
+    awk -v n="$1" '$1 == n {print $2; exit}' "$HB_LABELMAP"
+}
+
 # --- terminal topology (termtopo) ------------------------------------------
 
 # hb_assert_term_cwds CWD... - assert that for EVERY given CWD there exists a
