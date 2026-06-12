@@ -15,7 +15,10 @@
       "hb_assert_page 'document.getElementById(\"username\").value' '. == \"wisp\"'",
       "hb_assert_page 'window.__reset' '. == false'"
     ],
-    "timeout": 90
+    "timeout": 90,
+    "teardown": [
+      "hb_browser_kill"
+    ]
   },
   {
     "id": "br-delayed-authorize",
@@ -34,7 +37,10 @@
       "hb_assert_page 'window.__authorized' '. == true'",
       "hb_assert_page 'window.__reset' '. == false'"
     ],
-    "timeout": 90
+    "timeout": 90,
+    "teardown": [
+      "hb_browser_kill"
+    ]
   },
   {
     "id": "br-follow-link",
@@ -52,6 +58,9 @@
     "verify": [
       "hb_assert_page 'location.pathname.endsWith(\"done.html\")'"
     ],
-    "timeout": 60
+    "timeout": 60,
+    "teardown": [
+      "hb_browser_kill"
+    ]
   }
 ]
