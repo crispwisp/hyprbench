@@ -53,13 +53,14 @@ run_phase() { # SIG SNIPPET-LINES...
     HYPRLAND_INSTANCE_SIGNATURE=$sig bash -c "
         set -e
         source '$ROOT/lib/common.sh'
+        [[ -r '$ROOT/lib/browser.sh' ]] && source '$ROOT/lib/browser.sh'
         $(printf '%s\n' "$@")
     "
 }
 
 run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE
     local agent=$1 filter=$2 label=$3 tmo_override=$4 outfile=$5 track=${6:-headless} mode=${7:-nested}
-    local pass=0 fail=0 errors=0 total=0
+    local pass=0 fail=0 errors=0 total=0 skipped=0
 
     if [[ $mode == "host" && -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
         echo "host mode requires a running Hyprland session" >&2
@@ -82,9 +83,26 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE
         [[ -n $filter && $id != *"$filter"* ]] && continue
         instr=$(jq -r '.instruction' <<<"$task")
         tmo=${tmo_override:-$(jq -r '.timeout // 60' <<<"$task")}
-        total=$((total + 1))
 
         printf '%-28s ' "$id"
+
+        # dependency gate: a task may declare "requires": ["node", ...].
+        # Missing deps yield an unscored SKIP instead of an error, so optional
+        # categories (e.g. browser) degrade gracefully on lean installs.
+        local req missing=""
+        while IFS= read -r req; do
+            command -v "$req" >/dev/null 2>&1 || missing+="${missing:+,}$req"
+        done < <(jq -r '.requires[]? // empty' <<<"$task")
+        if [[ -n $missing ]]; then
+            skipped=$((skipped + 1))
+            echo "SKIP  (missing: $missing)"
+            jq -nc --arg id "$id" --arg m "$missing" --arg agent "$label" \
+                --arg track "$track" --arg mode "$mode" \
+                '{task:$id, track:$track, mode:$mode, status:"skip", reason:("missing:"+$m), agent:$agent}' \
+                >>"$outfile"
+            continue
+        fi
+        total=$((total + 1))
 
         local sig snapfile=""
         if [[ $mode == "host" ]]; then
@@ -189,7 +207,7 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE
     done < <(all_tasks)
 
     echo
-    echo "== $label [$track/$mode]: $pass/$total passed, $fail failed, $errors errors =="
+    echo "== $label [$track/$mode]: $pass/$total passed, $fail failed, $errors errors, $skipped skipped =="
     echo "results: $outfile"
     REPLY_PASS=$pass REPLY_TOTAL=$total
 }

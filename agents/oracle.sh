@@ -4,5 +4,6 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/lib/common.sh"
+[[ -r $ROOT/lib/browser.sh ]] && source "$ROOT/lib/browser.sh"
 set -e
 eval "$(jq -r '.oracle[]' "$HB_TASK_FILE")"

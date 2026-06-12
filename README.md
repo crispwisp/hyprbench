@@ -108,10 +108,15 @@ Task schema:
 
 `setup`, `oracle`, `verify` and the optional `teardown` (best-effort, not
 scored — for cross-task resources like a browser pinned to a port) are bash
-lines run with `lib/common.sh` sourced and `HYPRLAND_INSTANCE_SIGNATURE` set
-to the bench instance. The `oracle` is the reference solution — `validate`
-proves every task is solvable and every verifier is non-trivial (noop must
-fail it).
+lines run with `lib/common.sh` (and `lib/browser.sh`, if present) sourced and
+`HYPRLAND_INSTANCE_SIGNATURE` set to the bench instance. The `oracle` is the
+reference solution — `validate` proves every task is solvable and every
+verifier is non-trivial (noop must fail it).
+
+A task may declare runtime dependencies: `"requires": ["node", "chromium"]`.
+If any are missing the task yields an unscored **SKIP** (excluded from the
+total, recorded in the JSONL with `reason: "missing:..."`), so optional
+categories degrade gracefully instead of erroring on lean installs.
 
 ## Writing an agent
 
