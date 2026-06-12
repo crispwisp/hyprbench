@@ -1,0 +1,45 @@
+[
+  {
+    "id": "inst-game",
+    "category": "install",
+    "difficulty": "medium",
+    "mutates": true,
+    "requires": ["pacman", "sudo"],
+    "instruction": "Install the game 'gnome-mines' from the official repositories.",
+    "setup": [
+      "! pacman -Q gnome-mines >/dev/null 2>&1"
+    ],
+    "oracle": [
+      "sudo pacman -S --noconfirm gnome-mines"
+    ],
+    "verify": [
+      "pacman -Q gnome-mines",
+      "test -f /usr/share/applications/org.gnome.Mines.desktop"
+    ],
+    "teardown": [
+      "sudo pacman -Rns --noconfirm gnome-mines"
+    ],
+    "timeout": 300
+  },
+  {
+    "id": "inst-remove",
+    "category": "install",
+    "difficulty": "easy",
+    "mutates": true,
+    "requires": ["pacman", "sudo"],
+    "instruction": "The package 'sl' is installed on this system. Remove it completely.",
+    "setup": [
+      "pacman -Q sl >/dev/null 2>&1 || sudo pacman -S --noconfirm sl"
+    ],
+    "oracle": [
+      "sudo pacman -Rns --noconfirm sl"
+    ],
+    "verify": [
+      "! pacman -Q sl"
+    ],
+    "teardown": [
+      "sudo pacman -Rns --noconfirm sl 2>/dev/null || true"
+    ],
+    "timeout": 180
+  }
+]

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "q-cpu-cores",
+    "category": "query",
+    "difficulty": "easy",
+    "instruction": "How many CPU cores does this machine have? Write the answer (just the number) to the file whose path is in the HB_ANSWER_FILE environment variable.",
+    "setup": [],
+    "oracle": [
+      "nproc > \"$HB_ANSWER_FILE\""
+    ],
+    "verify": [
+      "hb_assert_answer_exact \"$(nproc)\""
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "q-hypr-version",
+    "category": "query",
+    "difficulty": "easy",
+    "instruction": "What version of Hyprland is this session running? Write the version number to the file whose path is in the HB_ANSWER_FILE environment variable.",
+    "setup": [],
+    "oracle": [
+      "hyprctl -j version | jq -r '.tag' | sed 's/^v//' > \"$HB_ANSWER_FILE\""
+    ],
+    "verify": [
+      "hb_assert_answer_regex \"$(hyprctl -j version | jq -r '.tag' | sed 's/^v//')\""
+    ],
+    "timeout": 60
+  },
+  {
+    "id": "q-largest-file",
+    "category": "query",
+    "difficulty": "medium",
+    "instruction": "The directory /tmp/hb-q-files contains several files. Which one is largest? Write just its filename to the file whose path is in the HB_ANSWER_FILE environment variable.",
+    "setup": [
+      "mkdir -p /tmp/hb-q-files",
+      "head -c 1024 /dev/urandom > /tmp/hb-q-files/notes.dat",
+      "head -c 8192 /dev/urandom > /tmp/hb-q-files/archive.bin",
+      "head -c 4096 /dev/urandom > /tmp/hb-q-files/image.raw"
+    ],
+    "oracle": [
+      "echo archive.bin > \"$HB_ANSWER_FILE\""
+    ],
+    "verify": [
+      "hb_assert_answer_regex 'archive\\.bin'"
+    ],
+    "teardown": [
+      "rm -rf /tmp/hb-q-files"
+    ],
+    "timeout": 90
+  },
+  {
+    "id": "q-window-count",
+    "category": "query",
+    "difficulty": "medium",
+    "instruction": "How many windows are currently open in this Hyprland session? Write just the number to the file whose path is in the HB_ANSWER_FILE environment variable.",
+    "setup": [
+      "hb_spawn Alpha",
+      "hb_spawn Beta",
+      "hb_spawn Gamma"
+    ],
+    "oracle": [
+      "hyprctl -j clients | jq 'length' > \"$HB_ANSWER_FILE\""
+    ],
+    "verify": [
+      "hb_assert_answer_exact \"$(hyprctl -j clients | jq 'length')\""
+    ],
+    "timeout": 90
+  }
+]

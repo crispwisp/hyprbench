@@ -54,6 +54,7 @@ run_phase() { # SIG SNIPPET-LINES...
         set -e
         source '$ROOT/lib/common.sh'
         [[ -r '$ROOT/lib/browser.sh' ]] && source '$ROOT/lib/browser.sh'
+        [[ -r '$ROOT/lib/apps.sh' ]] && source '$ROOT/lib/apps.sh'
         $(printf '%s\n' "$@")
     "
 }

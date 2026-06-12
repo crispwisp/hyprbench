@@ -1,0 +1,66 @@
+[
+  {
+    "id": "app-mpv-pause",
+    "category": "apps",
+    "difficulty": "easy",
+    "requires": ["mpv", "socat", "ffmpeg"],
+    "instruction": "A video is playing in an mpv window. Pause it.",
+    "setup": [
+      "hb_mpv_kill",
+      "hb_mpv_launch \"$(hb_media_fixture 30)\""
+    ],
+    "oracle": [
+      "hb_mpv_cmd set_property pause true"
+    ],
+    "verify": [
+      "hb_assert_mpv pause '. == true'"
+    ],
+    "teardown": [
+      "hb_mpv_kill"
+    ],
+    "timeout": 120
+  },
+  {
+    "id": "app-mpv-seek",
+    "category": "apps",
+    "difficulty": "medium",
+    "requires": ["mpv", "socat", "ffmpeg"],
+    "instruction": "A video is open, paused, in an mpv window. Seek to the 20 second mark (within 3 seconds either way) and keep it paused.",
+    "setup": [
+      "hb_mpv_kill",
+      "hb_mpv_launch \"$(hb_media_fixture 30)\" --pause"
+    ],
+    "oracle": [
+      "hb_mpv_cmd seek 20 absolute"
+    ],
+    "verify": [
+      "hb_assert_mpv time-pos '(. - 20) | if . < 0 then -. else . end | . <= 3'",
+      "hb_assert_mpv pause '. == true'"
+    ],
+    "teardown": [
+      "hb_mpv_kill"
+    ],
+    "timeout": 120
+  },
+  {
+    "id": "app-steam-signin-field",
+    "category": "apps",
+    "difficulty": "hard",
+    "requires": ["steam", "node", "curl"],
+    "instruction": "Steam is open at its sign-in screen. Type 'wisp' into the account name field. Do not enter a password and do not attempt to sign in.",
+    "setup": [
+      "hb_steam_kill",
+      "hb_steam_launch"
+    ],
+    "oracle": [
+      "hb_steam_eval '(()=>{const i=document.querySelectorAll(\"input\")[0];i.value=\"wisp\";return i.value})()'"
+    ],
+    "verify": [
+      "hb_assert_steam '(()=>{const i=document.querySelectorAll(\"input\")[0];return i?i.value:null})()' '. == \"wisp\"'"
+    ],
+    "teardown": [
+      "hb_steam_kill"
+    ],
+    "timeout": 240
+  }
+]
