@@ -51,13 +51,14 @@ all_tasks() {
 run_phase() { # SIG SNIPPET-LINES...
     local sig=$1
     shift
+    # </dev/null: phases must never inherit the suite loop's task-list pipe
     HYPRLAND_INSTANCE_SIGNATURE=$sig bash -c "
         set -e
         source '$ROOT/lib/common.sh'
         [[ -r '$ROOT/lib/browser.sh' ]] && source '$ROOT/lib/browser.sh'
         [[ -r '$ROOT/lib/apps.sh' ]] && source '$ROOT/lib/apps.sh'
         $(printf '%s\n' "$@")
-    "
+    " </dev/null
 }
 
 run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRACKS
@@ -214,11 +215,13 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
             [[ $track == "vision" ]] && agent_env+=(HB_WAYLAND_DISPLAY="$wd")
             # run the agent from its scratch dir, NOT the repo: agent CLIs
             # ingest CWD context, and the repo's tasks/*.json contain the
-            # oracle solutions - caught live when a pilot agent reported
-            # task JSON embedded in its prompt
+            # oracle solutions. stdin MUST be /dev/null: the agent otherwise
+            # inherits the suite loop's task-list pipe - claude -p slurped
+            # the remaining 45 tasks as prompt input AND drained the loop to
+            # a 1-task "suite" (one fd, two mysteries)
             (cd "$HB_TASK_TMPDIR" &&
                 env "${agent_env[@]}" timeout "$tmo" "$agent_abs") \
-                >"$logdir/agent-$id.log" 2>&1
+                <"/dev/null" >"$logdir/agent-$id.log" 2>&1
             agent_exit=$?
         fi
 
