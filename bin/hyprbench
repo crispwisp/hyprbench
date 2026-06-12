@@ -212,7 +212,12 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
                 PATH="$ROOT/bin:$PATH"
             )
             [[ $track == "vision" ]] && agent_env+=(HB_WAYLAND_DISPLAY="$wd")
-            env "${agent_env[@]}" timeout "$tmo" "$agent_abs" \
+            # run the agent from its scratch dir, NOT the repo: agent CLIs
+            # ingest CWD context, and the repo's tasks/*.json contain the
+            # oracle solutions - caught live when a pilot agent reported
+            # task JSON embedded in its prompt
+            (cd "$HB_TASK_TMPDIR" &&
+                env "${agent_env[@]}" timeout "$tmo" "$agent_abs") \
                 >"$logdir/agent-$id.log" 2>&1
             agent_exit=$?
         fi

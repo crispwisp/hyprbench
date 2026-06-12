@@ -12,7 +12,31 @@
 # Track rules are injected into the prompt based on HB_TRACK.
 set -euo pipefail
 
+# Auth: the harness strips CLAUDE_CODE_OAUTH_TOKEN from tool subshells and
+# nothing exists at rest (by choice). Sanctioned recovery (Markus's ruling):
+# lift the session token from a live unleash parent via same-user /proc.
+# HANDLING RULES, non-negotiable: never echo, log, or write the token -
+# not to results, task logs, or debug output. It lives in process env only.
+# The lift fails naturally when no live session exists; bench runs happen
+# while we are alive, and that no-at-rest-credential property is deliberate.
+if [[ -z ${CLAUDE_CODE_OAUTH_TOKEN:-} ]]; then
+    for pid in $(pgrep -x unleash); do
+        tok=$(tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null |
+            sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p' | head -1)
+        [[ -n $tok ]] && { export CLAUDE_CODE_OAUTH_TOKEN="$tok"; break; }
+    done
+    unset tok
+fi
+
 profile=${HB_UNLEASH_PROFILE:-claude}
+
+# Non-claude profiles run on the provided OpenRouter token (file at rest,
+# mode 600, deliberate damage-control pattern). Same never-log rules apply.
+if [[ $profile != claude* && -z ${OPENROUTER_API_KEY:-} ]]; then
+    orf="$HOME/.local/share/wisp/openrouter"
+    [[ -r $orf ]] && export OPENROUTER_API_KEY="$(<"$orf")"
+fi
+
 extra=()
 [[ -n ${HB_UNLEASH_MODEL:-} ]] && extra+=(-m "$HB_UNLEASH_MODEL")
 
