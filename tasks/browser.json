@@ -18,6 +18,10 @@
     "timeout": 90,
     "teardown": [
       "hb_browser_kill"
+    ],
+    "requires": [
+      "node",
+      "chromium"
     ]
   },
   {
@@ -40,6 +44,10 @@
     "timeout": 90,
     "teardown": [
       "hb_browser_kill"
+    ],
+    "requires": [
+      "node",
+      "chromium"
     ]
   },
   {
@@ -61,6 +69,10 @@
     "timeout": 60,
     "teardown": [
       "hb_browser_kill"
+    ],
+    "requires": [
+      "node",
+      "chromium"
     ]
   }
 ]

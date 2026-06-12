@@ -14,12 +14,19 @@ HB_CDP=${HB_CDP:-$(dirname "${BASH_SOURCE[0]}")/cdp.mjs}
 # with a throwaway profile, optionally opening fixtures/browser/FIXTURE.
 # Waits until the debugging port answers and a page target exists.
 hb_browser_launch() {
-    local url="" i
+    local url="" i browser_bin
+    # dispatch-exec children inherit the COMPOSITOR env, not ours — in host
+    # mode that env predates mise shims etc. Resolve to an absolute path in
+    # snippet context so the requires gate and the launch can never disagree.
+    browser_bin=$(command -v "$HB_BROWSER") || {
+        echo "hb_browser_launch: cannot resolve browser '$HB_BROWSER'" >&2
+        return 1
+    }
     [[ -n ${1:-} ]] && url="file://${HB_ROOT:-$PWD}/fixtures/browser/$1"
     HB_BROWSER_PROFILE=$(mktemp -d "${TMPDIR:-/tmp}/hb-browser.XXXXXX")
     # exec via the compositor so the window maps inside the bench instance
     hyprctl dispatch exec -- \
-        "$HB_BROWSER --remote-debugging-port=$HB_CDP_PORT \
+        "$browser_bin --remote-debugging-port=$HB_CDP_PORT \
          --user-data-dir=$HB_BROWSER_PROFILE --no-first-run \
          --disable-session-crashed-bubble $url" >/dev/null
     for ((i = 0; i < 75; i++)); do
