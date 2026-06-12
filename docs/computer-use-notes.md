@@ -98,6 +98,36 @@ good exactly when it punishes skipping the read-back.
   scoping also closes the reverse hole: pre-existing clutter can't *fake* a
   pass either.
 
+## Harness tooling
+
+Earned during hyperbench development, each by a real incident:
+
+- **A helper nothing executes is not code, it is a hypothesis.** An mpv
+  command-builder was broken from the day it was written; it survived three
+  consecutive diagnoses (load, settle time, tmpfs quota — all real phenomena,
+  none the cause) because every manual test bypassed it with hand-written
+  JSON. When a helper fails, test *the helper*, not the resource it wraps —
+  and give helpers contract self-tests (`doctor`) so "shipped" implies
+  "executed at least once."
+- **jq's `try EXPR catch .` feeds catch the error MESSAGE, not the original
+  value.** `map(try fromjson catch .)` silently turns every unparseable
+  string into jq error text. Bind first: `. as $s | try ($s | fromjson)
+  catch $s`.
+- **`pkill -f` can match the calling shell's own command line** when the
+  pattern appears literally in an instrumented wrapper — the command kills
+  itself with a confusing exit code (two independent victims, same day).
+  Bracket the first character: `pkill -f '[u]ser-data-dir=...'` cannot match
+  its own pattern text.
+- **Processes a compositor exec's log to the compositor, not to you.**
+  stderr of `hyprctl dispatch exec` children lands in the compositor log;
+  give long-running tools their own log file (`mpv --log-file=...`) or the
+  failure story is simply gone.
+- **Steam keeps shared mutable state in `~/.steam`** regardless of which
+  compositor instance it renders in — steam tasks must never run
+  concurrently with each other, and a bootstrapped steam answers CDP on
+  port 8080 within seconds while its sign-in page target appears much
+  later: gate on the target, not the endpoint.
+
 ## Proposed: browser task track
 
 CDP makes browser tasks as verifiable as window-manager tasks: launch a pinned
