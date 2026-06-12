@@ -86,9 +86,29 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
 
     mkdir -p "$(dirname "$outfile")"
     : >"$outfile"
-    local logdir
-    logdir="$(dirname "$outfile")/logs"
+    local logdir outdir
+    outdir="$(dirname "$outfile")"
+    logdir="$outdir/logs"
     mkdir -p "$logdir"
+
+    # provenance header: every run records the exact harness identity that
+    # produced it - hyprbench commit, profile, model, CLI versions. Scores
+    # without provenance are anecdotes.
+    local commit dirty=""
+    commit=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+    [[ -n $(git -C "$ROOT" status --porcelain 2>/dev/null) ]] && dirty="-dirty"
+    hb__ver() { timeout 5 "$1" --version </dev/null 2>/dev/null | head -1; }
+    jq -n --arg commit "$commit$dirty" --arg date "$(date -Is)" \
+        --arg host "$(hostname)" --arg mode "$mode" --arg track "$track" \
+        --arg label "$label" --arg agent "$agent_abs" \
+        --arg profile "${HB_UNLEASH_PROFILE:-}" --arg model "${HB_UNLEASH_MODEL:-}" \
+        --arg vu "$(hb__ver unleash)" --arg vc "$(hb__ver claude)" \
+        --arg vx "$(hb__ver codex)" --arg vp "$(hb__ver pi)" \
+        '{hyprbench_commit: $commit, date: $date, host: $host, mode: $mode,
+          track: $track, label: $label, agent: $agent,
+          unleash_profile: $profile, model_override: $model,
+          cli_versions: {unleash: $vu, claude: $vc, codex: $vx, pi: $vp}}' \
+        >"$outdir/meta-$label.json"
 
     while IFS= read -r task; do
         local id instr tmo style
@@ -279,6 +299,18 @@ run_suite() { # AGENT FILTER LABEL TIMEOUT_OVERRIDE OUTFILE TRACK MODE GATE_TRAC
     echo
     echo "== $label [$track/$mode]: $pass/$total passed, $fail failed, $errors errors, $skipped skipped =="
     echo "results: $outfile"
+    # speed is a first-class metric: end-to-end latency over scored tasks
+    local lat
+    lat=$(jq -s '[.[] | select(.status == "pass" or .status == "fail") | .seconds]
+        | if length == 0 then {total: 0, median: 0, p90: 0}
+          else sort as $s | ($s | length) as $n
+          | {total: ($s | add),
+             median: $s[(($n - 1) * 0.5) | round],
+             p90: $s[(($n - 1) * 0.9) | round]}
+          end' "$outfile")
+    echo "   latency: total $(jq -r .total <<<"$lat")s, median $(jq -r .median <<<"$lat")s/task, p90 $(jq -r .p90 <<<"$lat")s"
+    jq --argjson lat "$lat" '. + {latency: $lat}' "$outdir/meta-$label.json" \
+        >"$outdir/.meta.tmp" && mv "$outdir/.meta.tmp" "$outdir/meta-$label.json"
     REPLY_PASS=$pass REPLY_TOTAL=$total
 }
 

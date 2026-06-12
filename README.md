@@ -184,7 +184,13 @@ equivalents kept as reference implementations.
 ## Scoring
 
 `results/<run>/results.jsonl` has one record per task: status, agent exit
-code, wall-clock seconds. Headline metric: pass rate. Secondary: time per task.
+code, wall-clock seconds, and the task's `style` when declared.
+`results/<run>/meta-<label>.json` is the **provenance header**: hyprbench
+commit (with dirty flag), date, host, mode/track/label, unleash profile,
+model override, and the exact versions of the agent CLIs — scores without
+provenance are anecdotes. **Speed is a first-class metric** alongside
+correctness: end-to-end task latency (total / median / p90 over scored
+tasks) is printed per run and stamped into the provenance header.
 
 ## Limitations / future work
 
